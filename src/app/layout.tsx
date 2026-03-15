@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/theme-provider";
@@ -39,7 +40,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
         <Providers attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <NProgressHandler />
+          <Suspense fallback={null}>
+            <NProgressHandler />
+          </Suspense>
           {children}
           <RouteAwareToaster />
         </Providers>
