@@ -6,6 +6,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
+    const id = searchParams.get('id');
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '10', 10);
 
@@ -15,6 +16,11 @@ export async function GET(request: Request) {
       .from("vehicles")
       .select("*", { count: "exact" })
       .eq("deleted", false);
+
+    // Filter by ID if provided
+    if (id) {
+      query = query.eq('id', id);
+    }
 
     // Filter by status if provided
     if (status && status !== 'Todos') {
@@ -52,7 +58,84 @@ export async function GET(request: Request) {
     });
 
   } catch (err) {
-    console.error("Unexpected error in /api/vehicles:", err);
+    console.error("Unexpected error in /api/vehicles GET:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+    
+    // Get current user for created_by
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+
+    const { data, error } = await supabase
+      .from("vehicles")
+      .insert([
+        {
+          ...body,
+          created_by: user.id
+        }
+      ])
+      .select();
+
+    if (error) {
+      console.error("Error creating vehicle:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data?.[0] || null);
+  } catch (err) {
+    console.error("Unexpected error in /api/vehicles POST:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createClient();
+    
+    // Get current user for updated_by
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { id, ...updateData } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Vehicle ID is required" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("vehicles")
+      .update({
+        ...updateData,
+        updated_by: user.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", Number(id))
+      .select();
+
+    if (error) {
+      console.error("Error updating vehicle:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(data[0]);
+  } catch (err) {
+    console.error("Unexpected error in /api/vehicles PATCH:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

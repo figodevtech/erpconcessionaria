@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-
 import { VehicleTable } from "./vehicle-table"
 import { VehiclePagination } from "./vehicle-pagination"
 import { VehicleCard } from "./vehicle-card"
@@ -10,6 +9,7 @@ import { Loader2, Plus, LayoutGrid, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { motion, AnimatePresence } from "framer-motion"
+import { VehicleDialog } from "./vehicle-dialog"
 
 export type SellerType = "dealership" | "store" | "private";
 export type VehicleStatus = "Em venda" | "Vendido" | "Rascunho" | "Pagamento";
@@ -29,19 +29,19 @@ export interface Vehicle {
   transmission: string;
   color: string;
   doors: number;
-  bodyType: string;
+  body_type: string;
   image: string;
   city: string;
   state: string;
   seller: string;
-  sellerType: SellerType;
+  seller_type: SellerType;
   features: string[];
   description: string;
-  enableAiDescription: boolean;
-  aiDescription?: string | null;
-  engineSize?: string | null;
+  enable_ai_description: boolean;
+  ai_description?: string | null;
+  engine_size?: string | null;
   horsepower?: number | null;
-  isNew: boolean;
+  is_new: boolean;
   featured: boolean;
   message?: string;
   created_at: string;
@@ -80,14 +80,31 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
   const [loading, setLoading] = useState(true)
   const [showImages, setShowImages] = useState(false)
   const [viewMode, setViewMode] = useState<"list" | "grid">("list")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
 
-  const fetchVehicles = useCallback(async () => {
+  const handleCreateNew = () => {
+    setSelectedVehicle(null)
+    setIsDialogOpen(true)
+  }
+
+  const handleEditVehicle = (vehicle: Vehicle) => {
+    setSelectedVehicle(vehicle)
+    setIsDialogOpen(true)
+  }
+
+  const fetchVehicles = useCallback(async (newVehicle?: Vehicle) => {
     setLoading(true)
     try {
       const res = await fetch(`/api/vehicles?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&page=${page}&limit=10`)
       const data = await res.json()
       setVehicles(data.data || [])
       setTotalPages(data.meta?.totalPages || 1)
+      
+      // If a new vehicle was saved/updated, refresh the selected vehicle state
+      if (newVehicle) {
+        setSelectedVehicle(newVehicle)
+      }
     } catch (error) {
       console.error("Failed to fetch vehicles:", error)
     } finally {
@@ -111,7 +128,7 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
             <CardTitle>Lista de Veículos | <span className="text-muted-foreground font-normal font-mono">{vehicles.length} resultados</span></CardTitle>
             <CardDescription className="mt-1">
               <button
-                onClick={fetchVehicles}
+                onClick={() => fetchVehicles()}
                 disabled={loading}
                 className="inline-flex items-center gap-1 text-foreground/50 hover:text-foreground/70 hover:cursor-pointer disabled:opacity-50"
               >
@@ -151,7 +168,7 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
             </div>
 
             <Button
-              onClick={() => { }}
+              onClick={handleCreateNew}
               variant={"outline"}
               size={"sm"}
               className="cursor-pointer text-xs"
@@ -161,6 +178,12 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
             </Button>
           </div>
         </div>
+        <VehicleDialog
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          vehicle={selectedVehicle}
+          onSuccess={(v) => fetchVehicles(v)}
+        />
       </CardHeader>
       <CardContent className="min-h-[300px] -mt-[24px] px-4 pb-4 pt-6 relative">
         <div
@@ -168,7 +191,7 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
             } transition-all opacity-0 h-0.5 bg-slate-400 w-full overflow-hidden absolute left-0 right-0 top-2`}
         >
           <div
-            className={`w-1/2 bg-primary h-full absolute left-0 rounded-lg -translate-x-[100%] ${loading && "animate-slideIn "
+            className={`w-1/2 bg-primary h-full absolute left-0 rounded-lg -translate-x-full ${loading && "animate-slideIn "
               }`}
           />
         </div>
@@ -185,7 +208,12 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
                 className="w-full"
               >
                 <div className="rounded-md border">
-                  <VehicleTable vehicles={vehicles} loading={loading} showImages={showImages} />
+                  <VehicleTable
+                    vehicles={vehicles}
+                    loading={loading}
+                    showImages={showImages}
+                    onEdit={handleEditVehicle}
+                  />
                 </div>
               </motion.div>
             )}
