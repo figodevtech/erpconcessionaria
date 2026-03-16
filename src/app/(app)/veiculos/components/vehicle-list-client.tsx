@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, Plus, LayoutGrid, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { motion, AnimatePresence } from "framer-motion"
 
 export type SellerType = "dealership" | "store" | "private";
 export type VehicleStatus = "Em venda" | "Vendido" | "Rascunho" | "Pagamento";
@@ -172,29 +173,53 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
           />
         </div>
 
-        {viewMode === "list" ? (
-          <div className="rounded-md border">
-            <VehicleTable vehicles={vehicles} loading={loading} showImages={showImages} />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-            {loading && vehicles.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-muted-foreground w-full">
-                Carregando veículos...
-              </div>
-            ) : vehicles.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-muted-foreground w-full">
-                Nenhum veículo encontrado para a busca.
-              </div>
-            ) : (
-              vehicles.map((vehicle: Vehicle) => (
-                <div key={vehicle.id} className="h-full">
-                  <VehicleCard vehicle={vehicle} />
+        <div className="relative min-h-[400px]">
+          <AnimatePresence mode="wait">
+            {viewMode === "list" && (
+              <motion.div
+                key="list"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full"
+              >
+                <div className="rounded-md border">
+                  <VehicleTable vehicles={vehicles} loading={loading} showImages={showImages} />
                 </div>
-              ))
+              </motion.div>
             )}
-          </div>
-        )}
+
+            {viewMode === "grid" && (
+              <motion.div
+                key="grid"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full"
+              >
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                  {loading && vehicles.length === 0 ? (
+                    <div className="col-span-full py-12 text-center text-muted-foreground w-full">
+                      Carregando veículos...
+                    </div>
+                  ) : vehicles.length === 0 ? (
+                    <div className="col-span-full py-12 text-center text-muted-foreground w-full">
+                      Nenhum veículo encontrado para a busca.
+                    </div>
+                  ) : (
+                    vehicles.map((vehicle: Vehicle) => (
+                      <div key={vehicle.id} className="h-full">
+                        <VehicleCard vehicle={vehicle} />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         <VehiclePagination page={page} totalPages={totalPages} setPage={setPage} />
       </CardContent>

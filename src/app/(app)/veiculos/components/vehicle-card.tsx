@@ -1,6 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
-import { MapPin, Fuel, Gauge, Calendar, Star } from "lucide-react"
+import { MapPin, Fuel, Gauge, Calendar, Star, CreditCardIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Vehicle } from "./vehicle-list-client"
@@ -11,9 +11,19 @@ interface VehicleCardProps {
   priority?: boolean
 }
 
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "Em venda": return "bg-blue-500/10 text-blue-500"
+    case "Vendido": return "bg-green-500/10 text-green-500"
+    case "Rascunho": return "bg-orange-500/10 text-orange-500"
+    case "Pagamento": return "bg-yellow-500/10 text-yellow-500"
+    default: return "bg-gray-500/10 text-gray-500"
+  }
+}
+
 export function VehicleCard({ vehicle, priority }: VehicleCardProps) {
   return (
-    <Card className="group pt-0 overflow-hidden border-border bg-card transition-all hover:shadow-lg h-full">
+    <Card className="group pt-0 overflow-hidden border-border bg-card transition-all hover:shadow-lg h-full hover:cursor-pointer">
       <div className="relative aspect-16/10 overflow-hidden">
         <Image
           src={vehicle.image}
@@ -53,6 +63,9 @@ export function VehicleCard({ vehicle, priority }: VehicleCardProps) {
       </div>
 
       <CardContent className="p-4">
+        <div className="flex justify-end mb-2 -mt-2"><Badge variant="outline" className={`font-normal border-transparent ${getStatusColor(vehicle.status || '')}`}>
+          {vehicle.status || "Indefinido"}
+        </Badge></div>
         <div className="mb-1">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {vehicle.brand}
@@ -70,6 +83,12 @@ export function VehicleCard({ vehicle, priority }: VehicleCardProps) {
         </p>
 
         <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <CreditCardIcon className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-xs">
+              {vehicle.plate}
+            </span>
+          </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Calendar className="h-3.5 w-3.5 shrink-0" />
             <span className="text-xs">

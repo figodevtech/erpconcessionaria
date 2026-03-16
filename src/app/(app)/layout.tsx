@@ -26,7 +26,7 @@ export default async function DashboardLayout({
       <AppSidebar user={mappedUser} />
       <SidebarInset className="flex min-h-screen min-w-0">
         <DashboardHeader />
-        <div className="flex-1 overflow-auto p-4 lg:p-6">
+        <div className="flex-1 overflow-auto p-4 lg:p-6 not-dark:bg-accent/50">
           {children}
         </div>
       </SidebarInset>
