@@ -1,25 +1,70 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+
 import { VehicleTable } from "./vehicle-table"
 import { VehiclePagination } from "./vehicle-pagination"
+import { VehicleCard } from "./vehicle-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Plus } from "lucide-react"
+import { Loader2, Plus, LayoutGrid, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 
-export type Vehicle = {
-  id: string
-  brand: string
-  model: string
-  version: string
-  image: string
-  year: number
-  price: number
-  status: string
-  plate: string
-  created_at: string
+export type SellerType = "dealership" | "store" | "private";
+export type VehicleStatus = "Em venda" | "Vendido" | "Rascunho" | "Pagamento";
+
+export interface Vehicle {
+  id: string;
+  plate: string;
+  brand: string;
+  model: string;
+  version: string;
+  year: number;
+  year_model: number;
+  price: number;
+  fipe?: number | null;
+  mileage?: number | null;
+  fuel: string;
+  transmission: string;
+  color: string;
+  doors: number;
+  bodyType: string;
+  image: string;
+  city: string;
+  state: string;
+  seller: string;
+  sellerType: SellerType;
+  features: string[];
+  description: string;
+  enableAiDescription: boolean;
+  aiDescription?: string | null;
+  engineSize?: string | null;
+  horsepower?: number | null;
+  isNew: boolean;
+  featured: boolean;
+  message?: string;
+  created_at: string;
+  status: VehicleStatus;
 }
+
+export interface VehicleImage {
+  id: string;
+  vehicle_id: number;
+  image_url: string;
+  sort_order: number;
+  file_size?: number | null;
+  mime_type?: string | null;
+  width?: number | null;
+  height?: number | null;
+  created_at: string;
+  updated_at: string;
+  active: boolean;
+}
+
+export interface VehicleWithImages extends Vehicle {
+  images: VehicleImage[];
+}
+
 
 export type VehicleListClientProps = {
   search: string
@@ -33,6 +78,7 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [showImages, setShowImages] = useState(false)
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list")
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true)
@@ -77,13 +123,32 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex flex-row items-center justify-center gap-2 mr-8">
-              <span>Exibir Fotos</span>
-              <Switch
-                checked={showImages}
-                onCheckedChange={setShowImages}
-              />
+            {viewMode === "list" && (
+              <div className="flex flex-row items-center justify-center gap-2 mr-4">
+                <span className="text-sm font-medium">Exibir Fotos</span>
+                <Switch
+                  checked={showImages}
+                  onCheckedChange={setShowImages}
+                />
+              </div>
+            )}
+            <div className="flex flex-row items-center justify-center p-1 bg-muted rounded-md mr-2">
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-1 rounded-sm transition-all ${viewMode === "list" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                title="Visualização em Lista"
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-1 rounded-sm transition-all ${viewMode === "grid" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                title="Visualização em Grade"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
             </div>
+
             <Button
               onClick={() => { }}
               variant={"outline"}
@@ -106,9 +171,31 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
               }`}
           />
         </div>
-        <div className="rounded-md border">
-          <VehicleTable vehicles={vehicles} loading={loading} showImages={showImages} />
-        </div>
+
+        {viewMode === "list" ? (
+          <div className="rounded-md border">
+            <VehicleTable vehicles={vehicles} loading={loading} showImages={showImages} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            {loading && vehicles.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-muted-foreground w-full">
+                Carregando veículos...
+              </div>
+            ) : vehicles.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-muted-foreground w-full">
+                Nenhum veículo encontrado para a busca.
+              </div>
+            ) : (
+              vehicles.map((vehicle: Vehicle) => (
+                <div key={vehicle.id} className="h-full">
+                  <VehicleCard vehicle={vehicle} />
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         <VehiclePagination page={page} totalPages={totalPages} setPage={setPage} />
       </CardContent>
     </Card>
