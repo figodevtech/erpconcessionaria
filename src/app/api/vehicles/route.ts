@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("vehicles")
-      .select("*", { count: "exact" })
+      .select("*, vehicle_images(*)", { count: "exact" })
       .eq("deleted", false);
 
     // Filter by ID if provided
