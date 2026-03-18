@@ -36,16 +36,14 @@ export function VehicleBrandChart({ data }: { data: BrandData[] }) {
               bottom: 5,
             }}
           >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-            <XAxis
+            <CartesianGrid className="text-foreground" strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+            <XAxis className="text-foreground"
               dataKey="brand"
-              stroke="hsl(var(--muted-foreground))"
               fontSize={12}
               tickLine={false}
               axisLine={false}
             />
-            <YAxis
-              stroke="hsl(var(--muted-foreground))"
+            <YAxis className="text-foreground"
               fontSize={12}
               tickLine={false}
               axisLine={false}

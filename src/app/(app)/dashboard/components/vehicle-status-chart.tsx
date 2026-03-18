@@ -46,25 +46,35 @@ export function VehicleStatusChart({ data }: { data: StatusData[] }) {
               isAnimationActive
               animationDuration={600}
             >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill="currentColor" stroke="oklch(0.623 0.214 259.815)" />
+              {data.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill="currentColor"
+                  stroke="oklch(0.623 0.214 259.815)"
+                  className="hover:opacity-80 transition-opacity"
+                />
               ))}
+              <LabelList
+                dataKey="value"
+                position="outside"
+                fontSize={12}
+                stroke="none"
+                formatter={(value: any) => {
+                  const numValue = Number(value);
+                  return !isNaN(numValue) && numValue > 0 ? numValue : "";
+                }}
+                className="fill-foreground font-medium"
+              />
             </Pie>
-            <LabelList
-              dataKey="value"
-              position="outside"
-              fontSize={12}
-              stroke="none"
-              formatter={(value: number) => (value > 0 ? value : "")}
-              className="fill-foreground"
-            />
             <ChartTooltip
               cursor={false}
               content={<ChartTooltipContent hideLabel />}
             />
             <ChartLegend
-              className="-translate-y-2 flex-wrap gap-2 text-xs *:basis-1/2 *:justify-center sm:*:basis-1/4"
-              content={<ChartLegendContent nameKey="value" />} verticalAlign="bottom" />
+              className="text-foreground flex-wrap gap-2 text-xs *:basis-1/2 *:justify-center sm:*:basis-1/4 mt-4"
+              content={<ChartLegendContent nameKey="value" />}
+              verticalAlign="bottom"
+            />
           </PieChart>
         </ChartContainer>
       </CardContent>

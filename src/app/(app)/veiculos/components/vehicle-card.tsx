@@ -33,7 +33,7 @@ export function VehicleCard({ vehicle, priority }: VehicleCardProps) {
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           priority={priority}
         />
-        {vehicle.isNew && (
+        {vehicle.is_new && (
           <Badge className="absolute left-3 top-3 bg-accent text-accent-foreground">
             Novo
           </Badge>
@@ -43,9 +43,9 @@ export function VehicleCard({ vehicle, priority }: VehicleCardProps) {
             variant="secondary"
             className="bg-card/90 text-card-foreground backdrop-blur-sm"
           >
-            {vehicle.sellerType === "dealership"
+            {vehicle.seller_type === "dealership"
               ? "Concessionaria"
-              : vehicle.sellerType === "store"
+              : vehicle.seller_type === "store"
                 ? "Loja"
                 : "Particular"}
           </Badge>
