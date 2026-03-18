@@ -61,6 +61,7 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Vehicle } from "./vehicle-list-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -71,6 +72,9 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -80,6 +84,10 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  restrictToWindowEdges,
+  snapCenterToCursor,
+} from "@dnd-kit/modifiers";
 
 const vehicleSchema = z.object({
   brand: z.string().min(1, "Marca é obrigatória"),
@@ -427,20 +435,20 @@ export function VehicleDialog({
             </Tabs>
 
             <DialogFooter className="shrink-0 px-8 py-4 border-t bg-card/50 backdrop-blur-md mt-auto">
-              <div className="flex w-full justify-end gap-3">
+              <div className="flex w-full justify-end gap-3 pb-4 pr-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
                   disabled={loading}
-                  className="px-6 rounded-xl hover:bg-muted"
+                  className="px-6 rounded-xl hover:bg-muted hover:cursor-pointer"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="px-8 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+                  className="hover:cursor-pointer px-8 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
                 >
                   {loading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1292,6 +1300,105 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
   );
 }
 
+function ImageCard({
+  image,
+  index,
+  mainImageUrl,
+  onDelete,
+  onSetMain,
+  deletingId,
+  isPlaceholder = false,
+  isOverlay = false,
+}: {
+  image: any;
+  index?: number;
+  mainImageUrl: string;
+  onDelete?: (id: string) => void;
+  onSetMain?: (url: string) => void;
+  deletingId?: string | null;
+  isPlaceholder?: boolean;
+  isOverlay?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "group relative aspect-square rounded-2xl overflow-hidden border shadow-sm transition-all duration-300",
+        isPlaceholder
+          ? "border-primary/20 bg-primary/5 opacity-50 scale-95 border-dashed border-2"
+          : "border-primary/5 bg-muted",
+        isOverlay ? "shadow-2xl scale-105 ring-2 ring-primary/20" : "",
+        !isPlaceholder && !isOverlay ? "hover:shadow-xl hover:scale-[1.02]" : "",
+      )}
+    >
+      {index !== undefined && (
+        <div className="absolute top-2 left-3 z-20 flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary/60 backdrop-blur-md border border-white/20 text-[10px] font-bold text-white shadow-lg pointer-events-none">
+          {index + 1}º
+        </div>
+      )}
+
+      {!isPlaceholder && (
+        <>
+          <img
+            src={image.image_url}
+            alt="Vehicle"
+            className="h-full w-full object-cover transition-transform duration-100 group-hover:scale-105 pointer-events-none"
+          />
+
+          {!isOverlay && (
+            <div className="absolute inset-0 bg-linear-to-t from-black/50 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
+          )}
+
+          {onDelete && onSetMain && (
+            <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
+              <Button
+                size="icon"
+                className="h-9 w-9 bg-red-500/60 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 border-2 border-white/20 hover:scale-110 active:scale-95"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDelete(image.id);
+                }}
+                disabled={deletingId === image.id}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Excluir imagem"
+              >
+                {deletingId === image.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+
+              {image.image_url !== mainImageUrl && (
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-9 w-9 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-75 border-2 border-white/20 hover:bg-primary hover:text-primary-foreground hover:scale-110 active:scale-95"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSetMain(image.image_url);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  title="Definir como principal"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
+
+          {image.image_url === mainImageUrl && (
+            <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-primary text-[10px] font-bold text-primary-foreground uppercase tracking-widest shadow-lg">
+              Principal
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function SortableImage({
   image,
   index,
@@ -1317,75 +1424,27 @@ function SortableImage({
   } = useSortable({ id: image.id });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : "auto",
-    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative aspect-square rounded-2xl overflow-hidden border border-primary/5 bg-muted shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-grab active:cursor-grabbing"
+      className="cursor-grab active:cursor-grabbing"
       {...attributes}
       {...listeners}
     >
-      <div className="absolute top-2 left-3 z-20 flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary/60 backdrop-blur-md border border-white/20 text-[10px] font-bold text-white shadow-lg pointer-events-none">
-        {index + 1}º
-      </div>
-
-      <img
-        src={image.image_url}
-        alt="Vehicle"
-        className="h-full w-full object-cover transition-transform duration-100 group-hover:scale-105 pointer-events-none"
+      <ImageCard
+        image={image}
+        index={index}
+        mainImageUrl={mainImageUrl}
+        onDelete={onDelete}
+        onSetMain={onSetMain}
+        deletingId={deletingId}
+        isPlaceholder={isDragging}
       />
-
-      <div className="absolute inset-0 bg-linear-to-t from-black/50 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
-
-      <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
-        <Button
-          size="icon"
-          className="h-9 w-9 bg-red-500/60 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 border-2 border-white/20 hover:scale-110 active:scale-95"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete(image.id);
-          }}
-          disabled={deletingId === image.id}
-          onPointerDown={(e) => e.stopPropagation()}
-          title="Excluir imagem"
-        >
-          {deletingId === image.id ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Trash2 className="h-4 w-4" />
-          )}
-        </Button>
-
-        {image.image_url !== mainImageUrl && (
-          <Button
-            variant="secondary"
-            size="icon"
-            className="h-9 w-9 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-75 border-2 border-white/20 hover:bg-primary hover:text-primary-foreground hover:scale-110 active:scale-95"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onSetMain(image.image_url);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            title="Definir como principal"
-          >
-            <Check className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      {image.image_url === mainImageUrl && (
-        <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-primary text-[10px] font-bold text-primary-foreground uppercase tracking-widest shadow-lg">
-          Principal
-        </div>
-      )}
     </div>
   );
 }
@@ -1405,6 +1464,7 @@ function MediaTab({
   onImageDeleted: (id: string) => void;
   loading: boolean;
 }) {
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const mainImageUrl = form.watch("image");
@@ -1420,6 +1480,10 @@ function MediaTab({
     }),
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -1429,7 +1493,12 @@ function MediaTab({
 
       onImagesChange(arrayMove(images, oldIndex, newIndex));
     }
+
+    setActiveId(null);
   };
+
+  const activeImage = activeId ? images.find((i) => i.id === activeId) : null;
+  const activeIndex = activeId ? images.findIndex((i) => i.id === activeId) : -1;
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
@@ -1474,13 +1543,13 @@ function MediaTab({
 
   return (
     <div className="flex flex-col gap-8 p-1">
-      <div className="flex items-center justify-between border-b border-primary/10 pb-6">
+      <div className="flex items-center justify-between border-b border-primary/10 pb-2">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-primary/10 text-primary shadow-sm">
-            <Camera className="h-6 w-6" />
+            <Camera className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-xl font-bold tracking-tight">
+            <h3 className="text-md font-bold tracking-tight">
               Galeria de Fotos
             </h3>
             <p className="text-xs text-muted-foreground">
@@ -1507,13 +1576,15 @@ function MediaTab({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          modifiers={[snapCenterToCursor]}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
           <SortableContext
             items={images.map((img) => img.id)}
             strategy={rectSortingStrategy}
           >
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
               {images.map((image, index) => (
                 <SortableImage
                   key={image.id}
@@ -1530,6 +1601,28 @@ function MediaTab({
               ))}
             </div>
           </SortableContext>
+
+          <DragOverlay
+            modifiers={[restrictToWindowEdges]}
+            dropAnimation={{
+              sideEffects: defaultDropAnimationSideEffects({
+                styles: {
+                  active: {
+                    opacity: "0.5",
+                  },
+                },
+              }),
+            }}
+          >
+            {activeImage ? (
+              <ImageCard
+                image={activeImage}
+                index={activeIndex}
+                mainImageUrl={mainImageUrl}
+                isOverlay
+              />
+            ) : null}
+          </DragOverlay>
         </DndContext>
       )}
 
