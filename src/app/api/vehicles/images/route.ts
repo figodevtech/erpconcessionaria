@@ -28,7 +28,47 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+ 
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+    
+    // Get current user for security
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
+    const body = await request.json();
+    const { vehicle_id, image_url, url, sort_order, active } = body;
+
+    if (!vehicle_id || (!image_url && !url)) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("vehicle_images")
+      .insert({
+        vehicle_id: Number(vehicle_id),
+        image_url: image_url || url,
+        sort_order: sort_order || 0,
+        active: active !== undefined ? active : true
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error inserting vehicle image:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error("Unexpected error in /api/vehicles/images POST:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+ 
 export async function DELETE(request: Request) {
   try {
     const supabase = await createClient();

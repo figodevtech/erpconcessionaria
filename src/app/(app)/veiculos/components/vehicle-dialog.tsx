@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -59,10 +57,28 @@ import {
   FileText,
   Trash2,
   Check,
+  Plus,
+  Upload,
+  AlertCircle,
+  MoreVertical,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Search,
+  Calendar,
+  DollarSign,
+  Tag,
+  Hash,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Vehicle } from "./vehicle-list-client";
+import imageCompression from "browser-image-compression";
+import { createClient } from "@/utils/supabase/client";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DndContext,
@@ -1129,7 +1145,7 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
                 </FormLabel>
                 <Select
                   onValueChange={field.onChange}
-                  value={field.value}
+                  value={field.value === 'store' ? 'Loja' : field.value === 'dealership' ? 'Concessionária' : 'Particular'}
                   disabled={loading}
                 >
                   <FormControl>
@@ -1302,7 +1318,7 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
 
 function ImageCard({
   image,
-  index,
+  index = 0,
   mainImageUrl,
   onDelete,
   onSetMain,
@@ -1319,81 +1335,128 @@ function ImageCard({
   isPlaceholder?: boolean;
   isOverlay?: boolean;
 }) {
+  const status = image.status || "success";
+  const progress = image.progress || 0;
+  const isLocal = image.isLocal;
+
   return (
     <div
       className={cn(
-        "group relative aspect-square rounded-2xl overflow-hidden border shadow-sm transition-all duration-300",
-        isPlaceholder
-          ? "border-primary/20 bg-primary/5 opacity-50 scale-95 border-dashed border-2"
-          : "border-primary/5 bg-muted",
-        isOverlay ? "shadow-2xl scale-105 ring-2 ring-primary/20" : "",
-        !isPlaceholder && !isOverlay ? "hover:shadow-xl hover:scale-[1.02]" : "",
+        "relative group aspect-square rounded-2xl overflow-hidden border bg-muted/30 transition-all duration-300",
+        isOverlay
+          ? "shadow-2xl scale-105 z-50 cursor-grabbing border-primary/50"
+          : "hover:border-primary/30",
+        isPlaceholder && "opacity-0",
       )}
     >
-      {index !== undefined && (
-        <div className="absolute top-2 left-3 z-20 flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary/60 backdrop-blur-md border border-white/20 text-[10px] font-bold text-white shadow-lg pointer-events-none">
+      <img
+        src={image.url || image.image_url}
+        alt="Vehicle"
+        className={cn(
+          "h-full w-full object-cover transition-transform duration-500",
+          !isOverlay && "group-hover:scale-110",
+        )}
+      />
+
+      {/* Badges */}
+      <div className="absolute top-2 left-2 flex flex-col gap-1 pointer-events-none z-20">
+        <div className="bg-primary/95 backdrop-blur-md text-[10px] font-bold text-primary-foreground px-2 py-0.5 rounded-full shadow-lg border border-white/10 uppercase tracking-wider w-fit">
           {index + 1}º
+        </div>
+        {mainImageUrl === image.url && (
+          <div className="bg-emerald-500/95 backdrop-blur-md text-[10px] font-bold text-white px-2 py-0.5 rounded-full shadow-lg border border-white/10 uppercase tracking-wider w-fit">
+            Principal
+          </div>
+        )}
+        {isLocal && (
+          <div className="bg-blue-500/95 backdrop-blur-md text-[10px] font-bold text-white px-2 py-0.5 rounded-full shadow-lg border border-white/10 uppercase tracking-wider w-fit">
+            Novo
+          </div>
+        )}
+      </div>
+
+      {/* Status Overlay for Local Images */}
+      {isLocal && (
+        <div
+          className={cn(
+            "absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 transition-opacity z-10",
+            status === "success" ? "opacity-0 pointer-events-none" : "opacity-100",
+          )}
+        >
+          {status === "uploading" && (
+            <div className="w-full space-y-2">
+              <div className="flex justify-between text-[10px] text-white font-medium uppercase tracking-tight">
+                <span>Enviando...</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="h-1 bg-white/20" />
+            </div>
+          )}
+          {status === "error" && (
+            <div className="flex flex-col items-center gap-1 text-white">
+              <div className="p-1.5 rounded-full bg-destructive/20 text-destructive border border-destructive/30">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+              <span className="text-[10px] font-bold uppercase text-destructive-foreground">Erro</span>
+            </div>
+          )}
         </div>
       )}
 
-      {!isPlaceholder && (
-        <>
-          <img
-            src={image.image_url}
-            alt="Vehicle"
-            className="h-full w-full object-cover transition-transform duration-100 group-hover:scale-105 pointer-events-none"
-          />
+      {/* Controls */}
+      {!isOverlay && !isLocal && (
+        <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-between p-3 z-30">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg bg-white/10 hover:bg-destructive hover:text-white transition-colors text-white/90 border border-white/10 backdrop-blur-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(image.id);
+            }}
+            disabled={!!deletingId}
+          >
+            {deletingId === image.id ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+          </Button>
 
-          {!isOverlay && (
-            <div className="absolute inset-0 bg-linear-to-t from-black/50 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
-          )}
-
-          {onDelete && onSetMain && (
-            <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
-              <Button
-                size="icon"
-                className="h-9 w-9 bg-red-500/60 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 border-2 border-white/20 hover:scale-110 active:scale-95"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onDelete(image.id);
-                }}
-                disabled={deletingId === image.id}
-                onPointerDown={(e) => e.stopPropagation()}
-                title="Excluir imagem"
-              >
-                {deletingId === image.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-              </Button>
-
-              {image.image_url !== mainImageUrl && (
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-9 w-9 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-75 border-2 border-white/20 hover:bg-primary hover:text-primary-foreground hover:scale-110 active:scale-95"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onSetMain(image.image_url);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  title="Definir como principal"
-                >
-                  <Check className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          )}
-
-          {image.image_url === mainImageUrl && (
-            <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-primary text-[10px] font-bold text-primary-foreground uppercase tracking-widest shadow-lg">
+          {mainImageUrl !== image.url && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3 rounded-lg bg-white/10 hover:bg-primary hover:text-primary-foreground transition-colors text-white/90 border border-white/10 backdrop-blur-sm text-[10px] font-bold uppercase tracking-wide"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetMain?.(image.url);
+              }}
+            >
               Principal
-            </div>
+            </Button>
           )}
-        </>
+        </div>
+      )}
+
+      {/* Remove local image before upload */}
+      {!isOverlay && isLocal && status === 'idle' && (
+        <div className="absolute top-2 right-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            type="button"
+            variant="destructive"
+            size="icon"
+            className="h-6 w-6 rounded-full shadow-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(image.id);
+            }}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -1460,14 +1523,36 @@ function MediaTab({
   vehicleId?: string;
   form: any;
   images: any[];
-  onImagesChange: (images: any[]) => void;
+  onImagesChange: (value: any[] | ((prev: any[]) => any[])) => void;
   onImageDeleted: (id: string) => void;
   loading: boolean;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [mixedImages, setMixedImages] = useState<any[]>(images);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const mainImageUrl = form.watch("image");
+
+  // Sync mixedImages with props when images change (from DB)
+  useEffect(() => {
+    setMixedImages(prev => {
+      const normalizedImages = images.map(img => ({
+        ...img,
+        url: img.url || img.image_url // Ensure .url exists for consistent display
+      }));
+
+      // Filter local images: only keep those that aren't already represented in the incoming list
+      // Check both ID (since success merges the UUID) and URL
+      const trulyLocal = prev.filter(p => {
+        if (!p.isLocal) return false;
+        return !normalizedImages.some(img => img.id === p.id || img.image_url === p.image_url);
+      });
+
+      return [...normalizedImages, ...trulyLocal];
+    });
+  }, [images]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1488,19 +1573,152 @@ function MediaTab({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = images.findIndex((img) => img.id === active.id);
-      const newIndex = images.findIndex((img) => img.id === over.id);
+      const oldIndex = mixedImages.findIndex((img) => img.id === active.id);
+      const newIndex = mixedImages.findIndex((img) => img.id === over.id);
 
-      onImagesChange(arrayMove(images, oldIndex, newIndex));
+      const newOrder = arrayMove(mixedImages, oldIndex, newIndex);
+      setMixedImages(newOrder);
+
+      // If none of the moving images are local, we can notify parent immediately
+      // Otherwise, we wait for upload to notify parent of the total order
+      if (!newOrder.some(img => img.isLocal)) {
+        onImagesChange(newOrder);
+      }
     }
 
     setActiveId(null);
   };
 
-  const activeImage = activeId ? images.find((i) => i.id === activeId) : null;
-  const activeIndex = activeId ? images.findIndex((i) => i.id === activeId) : -1;
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const newLocalImages = Array.from(files).map(file => ({
+      id: Math.random().toString(36).substring(7),
+      url: URL.createObjectURL(file),
+      file,
+      progress: 0,
+      status: 'idle',
+      isLocal: true
+    }));
+
+    setMixedImages(prev => [...prev, ...newLocalImages]);
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const refreshImages = async () => {
+    if (!vehicleId) return;
+    try {
+      const res = await fetch(`/api/vehicles/images?vehicleId=${vehicleId}`);
+      if (res.ok) {
+        const data = await res.json();
+        onImagesChange(data);
+      }
+    } catch (err) {
+      console.error("Error refreshing images:", err);
+    }
+  };
+
+  const uploadImages = async () => {
+    const pendingImages = mixedImages.filter(img => img.isLocal && img.status !== 'success');
+    if (pendingImages.length === 0) return;
+
+    setUploading(true);
+    const supabase = createClient();
+
+    for (const image of pendingImages) {
+      try {
+        // Update status to uploading
+        setMixedImages(prev => prev.map(img =>
+          img.id === image.id ? { ...img, status: 'uploading', progress: 10 } : img
+        ));
+
+        // 1. Compression
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+          onProgress: (progress: number) => {
+            setMixedImages(prev => prev.map(img =>
+              img.id === image.id ? { ...img, progress: 10 + (progress * 0.2) } : img
+            ));
+          }
+        };
+
+        const compressedFile = await imageCompression(image.file!, options);
+
+        // 2. Upload to Storage
+        const fileExt = image.file!.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${vehicleId}/images/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('vehicles')
+          .upload(filePath, compressedFile, {
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Get Public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('vehicles')
+          .getPublicUrl(filePath);
+
+        // 3. Save to Database
+        const response = await fetch('/api/vehicles/images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vehicle_id: vehicleId,
+            image_url: publicUrl,
+            sort_order: mixedImages.findIndex(img => img.id === image.id),
+            active: true
+          })
+        });
+
+        if (!response.ok) throw new Error('Falha ao salvar no banco');
+        const savedImage = await response.json();
+
+        // Update form's main image if empty
+        if (!form.getValues('image')) {
+          form.setValue('image', publicUrl);
+        }
+
+        // Update local mixedImages status, keep in local state for progress feedback
+        setMixedImages(prev => prev.map(img =>
+          img.id === image.id ? { ...img, ...savedImage, status: 'success', progress: 100 } : img
+        ));
+
+      } catch (error) {
+        console.error('Upload error:', error);
+        setMixedImages(prev => prev.map(img =>
+          img.id === image.id ? { ...img, status: 'error' } : img
+        ));
+        toast.error(`Erro ao subir imagem: ${image.file?.name}`);
+      }
+    }
+
+    await refreshImages();
+    setUploading(false);
+    toast.success('Upload concluído!');
+  };
+
+  const activeImage = activeId ? mixedImages.find((i) => i.id === activeId) : null;
+  const activeIndex = activeId ? mixedImages.findIndex((i) => i.id === activeId) : -1;
+  const hasLocalImages = mixedImages.some(img => img.isLocal);
 
   const handleDelete = async (id: string) => {
+    // Local image deletion
+    if (mixedImages.find(img => img.id === id)?.isLocal) {
+      setMixedImages(prev => prev.filter(img => img.id !== id));
+      return;
+    }
+
     setDeletingId(id);
     setConfirmDeleteId(null);
     try {
@@ -1528,12 +1746,9 @@ function MediaTab({
             <ImageIcon className="h-16 w-16" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-xl font-bold tracking-tight">
-              Galeria de Mídia
-            </h3>
+            <h3 className="text-xl font-bold tracking-tight">Galeria de Mídia</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Salve o veículo primeiro para começar a gerenciar sua galeria de
-              fotos.
+              Salve o veículo primeiro para começar a gerenciar sua galeria de fotos.
             </p>
           </div>
         </div>
@@ -1549,21 +1764,55 @@ function MediaTab({
             <Camera className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-md font-bold tracking-tight">
-              Galeria de Fotos
-            </h3>
+            <h3 className="text-md font-bold tracking-tight">Galeria de Fotos</h3>
             <p className="text-xs text-muted-foreground">
-              {images.length}{" "}
-              {images.length === 1
-                ? "imagem encontrada"
-                : "imagens encontradas"}{" "}
+              {mixedImages.length}{" "}
+              {mixedImages.length === 1 ? "imagem encontrada" : "imagens encontradas"}{" "}
               para este veículo
             </p>
           </div>
         </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            className="hidden"
+            multiple
+            accept="image/*"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-xl border-primary/20 hover:bg-primary/5 gap-2"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Adicionar Imagens
+          </Button>
+
+          {hasLocalImages && (
+            <Button
+              type="button"
+              size="sm"
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-lg shadow-blue-500/20"
+              onClick={uploadImages}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              Realizar Upload
+            </Button>
+          )}
+        </div>
       </div>
 
-      {images.length === 0 ? (
+      {mixedImages.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 px-4 border-2 border-dashed rounded-3xl border-primary/10 bg-muted/5">
           <ImageIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
           <p className="text-sm text-dotted text-muted-foreground font-medium text-center">
@@ -1581,17 +1830,24 @@ function MediaTab({
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={images.map((img) => img.id)}
+            items={mixedImages.map((img) => img.id)}
             strategy={rectSortingStrategy}
           >
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-              {images.map((image, index) => (
+              {mixedImages.map((image, index) => (
                 <SortableImage
                   key={image.id}
                   image={image}
                   index={index}
                   mainImageUrl={mainImageUrl}
-                  onDelete={(id) => setConfirmDeleteId(id)}
+                  onDelete={(id) => {
+                    const img = mixedImages.find(i => i.id === id);
+                    if (img?.isLocal) {
+                      handleDelete(id);
+                    } else {
+                      setConfirmDeleteId(id);
+                    }
+                  }}
                   onSetMain={(url) => {
                     form.setValue("image", url);
                     toast.success("Foto principal atualizada!");
@@ -1634,9 +1890,7 @@ function MediaTab({
         <div className="space-y-1">
           <h4 className="text-sm font-bold">Gerenciamento de Imagens</h4>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            As imagens são carregadas automaticamente. Você pode remover imagens
-            clicando no ícone de lixeira que aparece ao passar o mouse. A
-            ordenação pode ser ajustada futuramente através de arraste-e-solte.
+            As imagens selecionadas localmente podem ser reordenadas antes do envio. Clique em "Realizar Upload" para salvar permanentemente.
           </p>
         </div>
       </div>
@@ -1656,8 +1910,7 @@ function MediaTab({
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm py-2">
               Tem certeza que deseja remover esta imagem? Esta ação não pode ser
-              desfeita e a foto será excluída permanentemente da galeria do
-              veículo.
+              desfeita e a foto será excluída permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">
