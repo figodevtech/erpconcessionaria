@@ -7,8 +7,8 @@ import NProgressHandler from "@/components/NProgressHandler";
 import { RouteAwareToaster } from "@/components/route-aware-toaster";
 
 export const metadata: Metadata = {
-  title: "ERP Oficina",
-  description: "Sistema de gestão para oficinas",
+  title: "ERP",
+  description: "Sistema de gestão para concessionárias",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192x192.png",
@@ -16,8 +16,8 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
-    title: 'ERP Oficina',
+    statusBarStyle: "default",
+    title: "ERP Oficina",
   },
 };
 
@@ -35,11 +35,23 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
-        <Providers attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
+      >
+        <Providers
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <Suspense fallback={null}>
             <NProgressHandler />
           </Suspense>

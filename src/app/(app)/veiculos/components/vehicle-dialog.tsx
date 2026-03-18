@@ -1331,17 +1331,17 @@ function SortableImage({
       {...attributes}
       {...listeners}
     >
-      <div className="absolute top-2 left-3 z-20 flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-[10px] font-bold text-white shadow-lg pointer-events-none">
+      <div className="absolute top-2 left-3 z-20 flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary/60 backdrop-blur-md border border-white/20 text-[10px] font-bold text-white shadow-lg pointer-events-none">
         {index + 1}º
       </div>
 
       <img
         src={image.image_url}
         alt="Vehicle"
-        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none"
+        className="h-full w-full object-cover transition-transform duration-100 group-hover:scale-105 pointer-events-none"
       />
 
-      <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-t from-black/50 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
 
       <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
         <Button
