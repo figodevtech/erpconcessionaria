@@ -1534,6 +1534,8 @@ function MediaTab({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainImageUrl = form.watch("image");
+  const [dragActive, setDragActive] = useState(false);
+  const dragCounter = useRef(0);
 
   // Sync mixedImages with props when images change (from DB)
   useEffect(() => {
@@ -1589,24 +1591,58 @@ function MediaTab({
     setActiveId(null);
   };
 
+  const processFiles = (files: FileList | File[]) => {
+    const newLocalImages = Array.from(files)
+      .filter(file => file.type.startsWith('image/'))
+      .map(file => ({
+        id: Math.random().toString(36).substring(7),
+        url: URL.createObjectURL(file),
+        file,
+        progress: 0,
+        status: 'idle',
+        isLocal: true
+      }));
+
+    if (newLocalImages.length > 0) {
+      setMixedImages(prev => [...prev, ...newLocalImages]);
+    }
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
-
-    const newLocalImages = Array.from(files).map(file => ({
-      id: Math.random().toString(36).substring(7),
-      url: URL.createObjectURL(file),
-      file,
-      progress: 0,
-      status: 'idle',
-      isLocal: true
-    }));
-
-    setMixedImages(prev => [...prev, ...newLocalImages]);
+    processFiles(files);
 
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.type === "dragenter") {
+      dragCounter.current++;
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      dragCounter.current--;
+      if (dragCounter.current === 0) {
+        setDragActive(false);
+      }
+    } else if (e.type === "dragover") {
+      setDragActive(true);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    dragCounter.current = 0;
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
     }
   };
 
@@ -1757,7 +1793,24 @@ function MediaTab({
   }
 
   return (
-    <div className="flex flex-col gap-8 p-1">
+    <div
+      className="flex flex-col gap-8 p-1 relative min-h-[500px]"
+      onDragEnter={handleDrag}
+      onDragLeave={handleDrag}
+      onDragOver={handleDrag}
+      onDrop={handleDrop}
+    >
+      {/* Drag & Drop Overlay */}
+      {dragActive && (
+        <div className="absolute w-full h-full inset-x-[-4px] inset-y-[-4px] z-50 rounded-3xl bg-primary/10 backdrop-blur-[6px] border-2 border-dashed border-primary/40 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200">
+          <div className="bg-background/90 p-8 rounded-full shadow-2xl border-2 border-primary/20 mb-6 transform transition-transform hover:scale-110">
+            <Plus className="h-12 w-12 text-primary animate-bounce font-bold" />
+          </div>
+          <p className="text-2xl font-bold text-primary tracking-tight">Solte as imagens aqui</p>
+          <p className="text-sm text-primary/70 mt-2 font-medium">As fotos serão adicionadas automaticamente à galeria</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-b border-primary/10 pb-2">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-primary/10 text-primary shadow-sm">
@@ -1812,120 +1865,126 @@ function MediaTab({
         </div>
       </div>
 
-      {mixedImages.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 px-4 border-2 border-dashed rounded-3xl border-primary/10 bg-muted/5">
-          <ImageIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
-          <p className="text-sm text-dotted text-muted-foreground font-medium text-center">
-            Nenhuma foto adicional encontrada.
-            <br />
-            As fotos enviadas aparecerão aqui.
-          </p>
-        </div>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          modifiers={[snapCenterToCursor]}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={mixedImages.map((img) => img.id)}
-            strategy={rectSortingStrategy}
+      <div>
+
+        {mixedImages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 px-4 border-2 border-dashed rounded-3xl border-primary/10 bg-muted/5">
+            <ImageIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
+            <p className="text-sm text-dotted text-muted-foreground font-medium text-center">
+              Nenhuma foto adicional encontrada.
+              <br />
+              As fotos enviadas aparecerão aqui.
+            </p>
+          </div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[snapCenterToCursor]}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
           >
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-              {mixedImages.map((image, index) => (
-                <SortableImage
-                  key={image.id}
-                  image={image}
-                  index={index}
-                  mainImageUrl={mainImageUrl}
-                  onDelete={(id) => {
-                    const img = mixedImages.find(i => i.id === id);
-                    if (img?.isLocal) {
-                      handleDelete(id);
-                    } else {
-                      setConfirmDeleteId(id);
-                    }
-                  }}
-                  onSetMain={(url) => {
-                    form.setValue("image", url);
-                    toast.success("Foto principal atualizada!");
-                  }}
-                  deletingId={deletingId}
-                />
-              ))}
-            </div>
-          </SortableContext>
-
-          <DragOverlay
-            modifiers={[restrictToWindowEdges]}
-            dropAnimation={{
-              sideEffects: defaultDropAnimationSideEffects({
-                styles: {
-                  active: {
-                    opacity: "0.5",
-                  },
-                },
-              }),
-            }}
-          >
-            {activeImage ? (
-              <ImageCard
-                image={activeImage}
-                index={activeIndex}
-                mainImageUrl={mainImageUrl}
-                isOverlay
-              />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      )}
-
-      {/* Info Card */}
-      <div className="mt-4 p-6 rounded-2xl bg-linear-to-br from-primary/5 to-transparent border border-primary/10 flex items-start gap-4">
-        <div className="p-2 rounded-lg bg-background shadow-sm mt-1">
-          <Info className="h-4 w-4 text-primary" />
-        </div>
-        <div className="space-y-1">
-          <h4 className="text-sm font-bold">Gerenciamento de Imagens</h4>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            As imagens selecionadas localmente podem ser reordenadas antes do envio. Clique em "Realizar Upload" para salvar permanentemente.
-          </p>
-        </div>
-      </div>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        open={!!confirmDeleteId}
-        onOpenChange={(open: boolean) => !open && setConfirmDeleteId(null)}
-      >
-        <AlertDialogContent className="rounded-3xl border-primary/10 shadow-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
-                <Trash2 className="h-5 w-5" />
-              </div>
-              Confirmar Exclusão
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm py-2">
-              Tem certeza que deseja remover esta imagem? Esta ação não pode ser
-              desfeita e a foto será excluída permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel className="rounded-xl border-primary/10 hover:bg-muted transition-colors">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors shadow-lg shadow-destructive/20"
-              onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+            <SortableContext
+              items={mixedImages.map((img) => img.id)}
+              strategy={rectSortingStrategy}
             >
-              Excluir Permanentemente
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                {mixedImages.map((image, index) => (
+                  <SortableImage
+                    key={image.id}
+                    image={image}
+                    index={index}
+                    mainImageUrl={mainImageUrl}
+                    onDelete={(id) => {
+                      const img = mixedImages.find(i => i.id === id);
+                      if (img?.isLocal) {
+                        handleDelete(id);
+                      } else {
+                        setConfirmDeleteId(id);
+                      }
+                    }}
+                    onSetMain={(url) => {
+                      form.setValue("image", url);
+                      toast.success("Foto principal atualizada!");
+                    }}
+                    deletingId={deletingId}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+
+            <DragOverlay
+              modifiers={[restrictToWindowEdges]}
+              dropAnimation={{
+                sideEffects: defaultDropAnimationSideEffects({
+                  styles: {
+                    active: {
+                      opacity: "0.5",
+                    },
+                  },
+                }),
+              }}
+            >
+              {activeImage ? (
+                <ImageCard
+                  image={activeImage}
+                  index={activeIndex}
+                  mainImageUrl={mainImageUrl}
+                  isOverlay
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        )}
+
+        {/* Info Card */}
+        <div className="mt-4 p-6 rounded-2xl bg-linear-to-br from-primary/5 to-transparent border border-primary/10 flex items-start gap-4">
+          <div className="p-2 rounded-lg bg-background shadow-sm mt-1">
+            <Info className="h-4 w-4 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold">Gerenciamento de Imagens</h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              As imagens selecionadas localmente podem ser reordenadas antes do envio. Clique em "Realizar Upload" para salvar permanentemente.
+            </p>
+          </div>
+        </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog
+          open={!!confirmDeleteId}
+          onOpenChange={(open: boolean) => !open && setConfirmDeleteId(null)}
+        >
+          <AlertDialogContent className="rounded-3xl border-primary/10 shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                Confirmar Exclusão
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm py-2">
+                Tem certeza que deseja remover esta imagem? Esta ação não pode ser
+                desfeita e a foto será excluída permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-3 sm:gap-4 mt-2">
+              <AlertDialogCancel 
+                className="rounded-xl border-primary/10 hover:bg-muted transition-colors px-6"
+                onClick={() => setConfirmDeleteId(null)}
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors shadow-lg shadow-destructive/20 px-6"
+                onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+              >
+                Excluir Permanentemente
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }
