@@ -62,3 +62,39 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createClient();
+    
+    // Get current user for security
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { images } = await request.json();
+
+    if (!images || !Array.isArray(images)) {
+      return NextResponse.json({ error: "Invalid images data" }, { status: 400 });
+    }
+
+    // Perform bulk update
+    for (const img of images) {
+      const { error } = await supabase
+        .from("vehicle_images")
+        .update({ sort_order: img.sort_order })
+        .eq("id", img.id);
+      
+      if (error) {
+        console.error(`Error updating image ${img.id}:`, error);
+        throw error;
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Unexpected error in /api/vehicles/images PATCH:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}

@@ -63,6 +63,23 @@ import {
 import { toast } from "sonner";
 import { Vehicle } from "./vehicle-list-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const vehicleSchema = z.object({
   brand: z.string().min(1, "Marca é obrigatória"),
@@ -273,6 +290,25 @@ export function VehicleDialog({
 
       const savedVehicle = await response.json();
 
+      // Update image sort order if we have images and we are editing
+      if (isEditing && vehicleImages.length > 1) {
+        const sortedImages = vehicleImages.map((img, index) => ({
+          id: img.id,
+          sort_order: index,
+        }));
+
+        const imagesResponse = await fetch("/api/vehicles/images", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ images: sortedImages }),
+        });
+
+        if (!imagesResponse.ok) {
+          console.error("Failed to update image order");
+          // Non-critical error, we still successfully saved the vehicle
+        }
+      }
+
       toast.success(
         isEditing
           ? "Veículo atualizado com sucesso!"
@@ -378,6 +414,7 @@ export function VehicleDialog({
                     vehicleId={vehicle?.id}
                     form={form}
                     images={vehicleImages}
+                    onImagesChange={setVehicleImages}
                     onImageDeleted={(id) =>
                       setVehicleImages((prev) =>
                         prev.filter((img) => img.id !== id),
@@ -1255,22 +1292,144 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
   );
 }
 
+function SortableImage({
+  image,
+  index,
+  mainImageUrl,
+  onDelete,
+  onSetMain,
+  deletingId,
+}: {
+  image: any;
+  index: number;
+  mainImageUrl: string;
+  onDelete: (id: string) => void;
+  onSetMain: (url: string) => void;
+  deletingId: string | null;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: image.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : "auto",
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group relative aspect-square rounded-2xl overflow-hidden border border-primary/5 bg-muted shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-grab active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
+    >
+      <div className="absolute top-2 left-3 z-20 flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-[10px] font-bold text-white shadow-lg pointer-events-none">
+        {index + 1}º
+      </div>
+
+      <img
+        src={image.image_url}
+        alt="Vehicle"
+        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none"
+      />
+
+      <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
+      <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
+        <Button
+          size="icon"
+          className="h-9 w-9 bg-red-500/60 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 border-2 border-white/20 hover:scale-110 active:scale-95"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete(image.id);
+          }}
+          disabled={deletingId === image.id}
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Excluir imagem"
+        >
+          {deletingId === image.id ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+        </Button>
+
+        {image.image_url !== mainImageUrl && (
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-9 w-9 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-75 border-2 border-white/20 hover:bg-primary hover:text-primary-foreground hover:scale-110 active:scale-95"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSetMain(image.image_url);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            title="Definir como principal"
+          >
+            <Check className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      {image.image_url === mainImageUrl && (
+        <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-primary text-[10px] font-bold text-primary-foreground uppercase tracking-widest shadow-lg">
+          Principal
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MediaTab({
   vehicleId,
   form,
   images,
+  onImagesChange,
   onImageDeleted,
   loading,
 }: {
   vehicleId?: string;
   form: any;
   images: any[];
+  onImagesChange: (images: any[]) => void;
   onImageDeleted: (id: string) => void;
   loading: boolean;
 }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const mainImageUrl = form.watch("image");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = images.findIndex((img) => img.id === active.id);
+      const newIndex = images.findIndex((img) => img.id === over.id);
+
+      onImagesChange(arrayMove(images, oldIndex, newIndex));
+    }
+  };
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
@@ -1345,66 +1504,33 @@ function MediaTab({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {images.map((image) => (
-            <div
-              key={image.id}
-              className="group relative aspect-square rounded-2xl overflow-hidden border border-primary/5 bg-muted shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
-            >
-              <img
-                src={image.image_url}
-                alt="Vehicle"
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-              />
-
-              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-              <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="h-9 w-9 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 border-2 border-white/20 hover:scale-110 active:scale-95"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setConfirmDeleteId(image.id);
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={images.map((img) => img.id)}
+            strategy={rectSortingStrategy}
+          >
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              {images.map((image, index) => (
+                <SortableImage
+                  key={image.id}
+                  image={image}
+                  index={index}
+                  mainImageUrl={mainImageUrl}
+                  onDelete={(id) => setConfirmDeleteId(id)}
+                  onSetMain={(url) => {
+                    form.setValue("image", url);
+                    toast.success("Foto principal atualizada!");
                   }}
-                  disabled={deletingId === image.id}
-                  title="Excluir imagem"
-                >
-                  {deletingId === image.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </Button>
-
-                {image.image_url !== mainImageUrl && (
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-9 w-9 rounded-full shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-75 border-2 border-white/20 hover:bg-primary hover:text-primary-foreground hover:scale-110 active:scale-95"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      form.setValue("image", image.image_url);
-                      toast.success("Foto principal atualizada!");
-                    }}
-                    title="Definir como principal"
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-
-              {image.image_url === mainImageUrl && (
-                <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-primary text-[10px] font-bold text-primary-foreground uppercase tracking-widest shadow-lg">
-                  Principal
-                </div>
-              )}
+                  deletingId={deletingId}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Info Card */}
