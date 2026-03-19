@@ -139,3 +139,47 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: "Vehicle ID is required" }, { status: 400 });
+    }
+
+    // Soft delete: set deleted = true
+    const { data, error } = await supabase
+      .from("vehicles")
+      .update({
+        deleted: true,
+        updated_by: user.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", Number(id))
+      .select();
+
+    if (error) {
+      console.error("Error deleting vehicle:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: "Veículo excluído com sucesso" });
+  } catch (err) {
+    console.error("Unexpected error in /api/vehicles DELETE:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}

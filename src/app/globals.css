@@ -138,6 +138,7 @@
 
 @theme {
   --animate-slideIn: slideIn 1500ms ease-out infinite;
+  --animate-ai-shimmer: ai-shimmer 2s linear infinite;
 
   @keyframes slideIn {
     0% {
@@ -147,10 +148,30 @@
     100% {
       transform: translateX(200%);
     }
-
   }
 
+  @keyframes ai-shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+}
 
+@layer utilities {
+  .ai-glow-loading {
+    @apply relative overflow-hidden border-primary/30 shadow-[0_0_15px_rgba(var(--primary),0.2)];
+    background: linear-gradient(
+      90deg,
+      rgba(var(--primary), 0.05) 25%,
+      rgba(var(--primary), 0.15) 50%,
+      rgba(var(--primary), 0.05) 75%
+    );
+    background-size: 200% 100%;
+    animation: ai-shimmer 2s infinite;
+  }
 }
 
 /* Para Chrome, Edge e Safari */

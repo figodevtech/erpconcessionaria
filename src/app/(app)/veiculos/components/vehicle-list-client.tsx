@@ -213,6 +213,7 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
                     loading={loading}
                     showImages={showImages}
                     onEdit={handleEditVehicle}
+                    onDeleteSuccess={() => fetchVehicles()}
                   />
                 </div>
               </motion.div>

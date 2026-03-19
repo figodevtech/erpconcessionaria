@@ -69,9 +69,13 @@ import {
   DollarSign,
   Tag,
   Hash,
+} from "lucide-react";
+import { TagInput } from "./tag-input";
+import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  Cog,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -85,6 +89,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -104,6 +109,8 @@ import {
   restrictToWindowEdges,
   snapCenterToCursor,
 } from "@dnd-kit/modifiers";
+import { AIDescriptionBox } from "./ai-description-box";
+import { formatCurrency, parseCurrency } from "@/lib/utils";
 
 const vehicleSchema = z.object({
   brand: z.string().min(1, "Marca é obrigatória"),
@@ -162,6 +169,8 @@ export function VehicleDialog({
 }: VehicleDialogProps) {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
+  const [aiStats, setAiStats] = useState<{ used: number; limit: number; remaining: number } | null>(null);
   const [vehicleImages, setVehicleImages] = useState<any[]>([]);
   const isEditing = !!vehicle;
 
@@ -171,16 +180,16 @@ export function VehicleDialog({
       brand: "",
       model: "",
       version: "",
-      year: new Date().getFullYear(),
-      year_model: new Date().getFullYear(),
+      year: "" as any,
+      year_model: "" as any,
       price: 0,
       fipe: null,
       mileage: null,
-      fuel: "Flex",
-      transmission: "Automático",
+      fuel: "",
+      transmission: "",
       color: "",
-      doors: 4,
-      body_type: "SUV",
+      doors: "" as any,
+      body_type: "",
       image: "",
       city: "",
       state: "",
@@ -198,6 +207,23 @@ export function VehicleDialog({
       plate: "",
     },
   });
+
+  // Fetch AI stats on load
+  useEffect(() => {
+    async function fetchAIStats() {
+      if (!open) return;
+      try {
+        const response = await fetch("/api/ai/generate-description");
+        if (response.ok) {
+          const data = await response.json();
+          setAiStats(data);
+        }
+      } catch (error) {
+        console.error("Error fetching AI stats:", error);
+      }
+    }
+    fetchAIStats();
+  }, [open]);
 
   // Fetch updated vehicle data when dialog opens for editing
   useEffect(() => {
@@ -261,16 +287,16 @@ export function VehicleDialog({
         brand: "",
         model: "",
         version: "",
-        year: new Date().getFullYear(),
-        year_model: new Date().getFullYear(),
+        year: "" as any,
+        year_model: "" as any,
         price: 0,
         fipe: null,
         mileage: null,
-        fuel: "Flex",
-        transmission: "Automático",
+        fuel: "",
+        transmission: "",
         color: "",
-        doors: 4,
-        body_type: "SUV",
+        doors: "" as any,
+        body_type: "",
         image: "",
         city: "",
         state: "",
@@ -341,6 +367,48 @@ export function VehicleDialog({
       toast.error(error.message || "Erro ao salvar veículo");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGenerateAIDescription() {
+    if (!vehicle?.id) {
+      toast.error("Salve o veículo primeiro antes de gerar a descrição com IA.");
+      return;
+    }
+
+    setGeneratingAI(true);
+    try {
+      const response = await fetch("/api/ai/generate-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vehicleId: vehicle.id,
+          action: form.watch("ai_description") ? 'regenerate' : 'generate'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao gerar descrição");
+      }
+
+      form.setValue("ai_description", result.description);
+      form.setValue("enable_ai_description", true);
+
+      // Update stats if returned
+      if (result.stats) {
+        setAiStats(result.stats);
+      }
+
+      toast.success("Descrição gerada com IA com sucesso!", {
+        description: `Você ainda tem ${result.stats?.remaining || 0} gerações este mês.`
+      });
+    } catch (error: any) {
+      console.error("Error generating AI description:", error);
+      toast.error(error.message || "Erro ao gerar descrição com IA");
+    } finally {
+      setGeneratingAI(false);
     }
   }
 
@@ -434,7 +502,13 @@ export function VehicleDialog({
                 value="Marketplace"
               >
                 <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
-                  <MarketplaceTab form={form} loading={loading} />
+                  <MarketplaceTab
+                    form={form}
+                    loading={loading}
+                    onGenerateAI={handleGenerateAIDescription}
+                    generatingAI={generatingAI}
+                    aiStats={aiStats}
+                  />
                 </ScrollArea>
               </TabsContent>
 
@@ -556,7 +630,7 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                 </p>
 
                 {/* Descriptive Specs Summary */}
-                <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-muted-foreground mr-auto">
                   {form.watch("price") && (
                     <div className="flex items-center gap-1 bg-muted/40 px-2 py-0.5 rounded-full">
                       <Coins className="h-3 w-3 text-primary/60" />
@@ -590,6 +664,26 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     </div>
                   )}
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="featured"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0 bg-primary/5 px-3 py-1.5 rounded-xl border border-primary/20 hover:bg-primary/10 transition-colors cursor-pointer group/switch">
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={loading}
+                          className="data-[state=checked]:bg-primary scale-90"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-primary cursor-pointer select-none">
+                        Veículo Destaque
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
           </div>
@@ -776,6 +870,7 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                   <Input
                     type="number"
                     {...field}
+                    value={field.value ?? ""}
                     disabled={loading}
                     className={cn(
                       "bg-background/50 rounded-lg h-10",
@@ -803,6 +898,7 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                   <Input
                     type="number"
                     {...field}
+                    value={field.value ?? ""}
                     disabled={loading}
                     className={cn(
                       "bg-background/50 rounded-lg h-10",
@@ -847,14 +943,23 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                 </FormLabel>
                 <FormControl>
                   <Input
-                    type="number"
-                    step="0.01"
-                    {...field}
+                    type="text"
                     disabled={loading}
                     className={cn(
                       "bg-primary/5 border-primary/20 rounded-lg h-10 font-semibold",
                       form.formState.errors.price && "border-destructive ring-1 ring-destructive"
                     )}
+                    value={field.value ? formatCurrency(field.value) : ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Permitir apenas números e pontuação de moeda
+                      const numericValue = value.replace(/\D/g, "");
+                      if (numericValue) {
+                        field.onChange(Number(numericValue) / 100);
+                      } else {
+                        field.onChange(0);
+                      }
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -872,12 +977,19 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                 </FormLabel>
                 <FormControl>
                   <Input
-                    type="number"
-                    step="0.01"
-                    {...field}
-                    value={field.value || ""}
+                    type="text"
                     disabled={loading}
                     className="bg-background/50 rounded-lg h-10"
+                    value={field.value ? formatCurrency(field.value) : ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const numericValue = value.replace(/\D/g, "");
+                      if (numericValue) {
+                        field.onChange(Number(numericValue) / 100);
+                      } else {
+                        field.onChange(0);
+                      }
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -975,7 +1087,7 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent>
+                  <SelectContent alignItemWithTrigger={false}>
                     <SelectItem value="Flex">Flex</SelectItem>
                     <SelectItem value="Gasolina">Gasolina</SelectItem>
                     <SelectItem value="Etanol">Etanol</SelectItem>
@@ -1013,7 +1125,7 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent>
+                  <SelectContent alignItemWithTrigger={false}>
                     <SelectItem value="Manual">Manual</SelectItem>
                     <SelectItem value="Automático">Automático</SelectItem>
                     <SelectItem value="CVT">CVT</SelectItem>
@@ -1103,7 +1215,7 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent>
+                  <SelectContent alignItemWithTrigger={false}>
                     <SelectItem value="Sedan">Sedan</SelectItem>
                     <SelectItem value="Hatch">Hatch</SelectItem>
                     <SelectItem value="SUV">SUV</SelectItem>
@@ -1120,6 +1232,42 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
         </div>
       </div>
 
+      {/* Características */}
+      <div className="group border rounded-2xl p-6 bg-card/50 shadow-sm hover:shadow-md hover:bg-card transition-all space-y-6 border-primary/5">
+        <div className="flex items-center gap-3 border-b border-primary/10 pb-4">
+          <div className="p-2 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <Cog className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold tracking-tight">Características</h3>
+            <p className="text-xs text-muted-foreground">
+              Características do veículo
+            </p>
+          </div>
+
+        </div>        <FormField
+          control={form.control}
+          name="features"
+          render={({ field }) => (
+            <div className="space-y-2">
+              <p className="ml-2 text-xs text-muted-foreground italic">
+                Digite e pressione Enter para adicionar uma característica
+              </p>
+              <FormItem>
+                <FormControl>
+                  <TagInput
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={loading}
+                    placeholder="Ex: Teto Solar, Banco de Couro, Câmera de Ré..."
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </div>
+          )}
+        />
+      </div>
       {/* Localização */}
       <div className="group border rounded-2xl p-6 bg-card/50 shadow-sm hover:shadow-md hover:bg-card transition-all space-y-6 border-primary/5">
         <div className="flex items-center gap-3 border-b border-primary/10 pb-4">
@@ -1195,22 +1343,19 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
   );
 }
 
-function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
+
+function MarketplaceTab({ form, loading, onGenerateAI, generatingAI, aiStats }: { form: any; loading: boolean; onGenerateAI?: () => void; generatingAI?: boolean; aiStats?: any }) {
   return (
-    <div className="flex flex-col gap-6 p-1">
-      {/* Vendedor e Publicação */}
+    <div className="flex flex-col gap-8 p-1">
+      {/* Vendedor e Publicação Section */}
       <div className="group border rounded-2xl p-6 bg-card/50 shadow-sm hover:shadow-md hover:bg-card transition-all space-y-6 border-primary/5">
         <div className="flex items-center gap-3 border-b border-primary/10 pb-4">
           <div className="p-2 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <Store className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-lg font-bold tracking-tight">
-              Vendedor e Publicação
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Informações sobre quem está vendendo e detalhes do anúncio
-            </p>
+            <h3 className="text-lg font-bold tracking-tight">Vendedor e Descrição</h3>
+            <p className="text-xs text-muted-foreground">Descreva o veículo e o vendedor</p>
           </div>
         </div>
 
@@ -1220,22 +1365,9 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
             name="seller"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className={cn(
-                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
-                  form.formState.errors.seller && "text-destructive"
-                )}>
-                  Vendedor *
-                </FormLabel>
+                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Vendedor *</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="Nome do vendedor"
-                    {...field}
-                    disabled={loading}
-                    className={cn(
-                      "bg-background/50 rounded-lg h-10",
-                      form.formState.errors.seller && "border-destructive ring-1 ring-destructive"
-                    )}
-                  />
+                  <Input placeholder="Nome do vendedor" {...field} disabled={loading} className="bg-background/50 h-10 rounded-lg" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -1247,22 +1379,10 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
             name="seller_type"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className={cn(
-                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
-                  form.formState.errors.seller_type && "text-destructive"
-                )}>
-                  Tipo de Vendedor *
-                </FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value === 'store' ? 'Loja' : field.value === 'dealership' ? 'Concessionária' : 'Particular'}
-                  disabled={loading}
-                >
+                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tipo de Vendedor *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value === "dealership" ? "Concessionária" : field.value === "store" ? "Loja" : field.value === "private" ? "Particular" : ""} disabled={loading}>
                   <FormControl>
-                    <SelectTrigger className={cn(
-                      "bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10",
-                      form.formState.errors.seller_type && "border-destructive ring-1 ring-destructive"
-                    )}>
+                    <SelectTrigger className="bg-background/50 h-10 rounded-lg">
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   </FormControl>
@@ -1276,23 +1396,20 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
               </FormItem>
             )}
           />
+          <div className="col-span-2">
 
-          <div className="col-span-1 md:col-span-2">
             <FormField
               control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center gap-2 mb-2 ml-1">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Descrição *
-                    </FormLabel>
-                  </div>
+                  <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Descrição Original / Manual *
+                  </FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Descreva o veículo com detalhes, opcionais e estado de conservação..."
-                      className="min-h-[150px] bg-background/50 rounded-xl border-primary/5 hover:border-primary/20 focus:border-primary transition-all p-4 resize-none"
+                      placeholder="Descreva detalhes adicionais..."
+                      className="min-h-[120px] bg-background/50 rounded-xl border-primary/10"
                       {...field}
                       disabled={loading}
                     />
@@ -1305,123 +1422,97 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
         </div>
       </div>
 
-      {/* Destaques e IA */}
-      <div className="relative group overflow-hidden border rounded-3xl p-8 bg-linear-to-br from-primary/5 via-card to-background shadow-lg space-y-6 border-primary/20">
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-          <Sparkles className="h-24 w-24 text-primary" />
+      {/* Descrição e IA Section */}
+      <div className="group border rounded-2xl p-6 bg-card/50 shadow-sm hover:shadow-md hover:bg-card transition-all space-y-6 border-primary/5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-primary/10 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold tracking-tight">Descrição de IA</h3>
+              <p className="text-xs text-muted-foreground">Texto descritivo otimizado por IA para conversão</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {aiStats && (
+              <div className="hidden md:flex flex-col items-end mr-2">
+                <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider leading-none">Cota de IA</span>
+                <span className="text-xs font-medium">
+                  {aiStats.used} / {aiStats.limit} <span className="text-muted-foreground ml-0.5">usadas</span>
+                </span>
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-primary/20 hover:bg-primary/10 gap-2 h-9 shadow-sm"
+              onClick={onGenerateAI}
+              disabled={loading || generatingAI || (aiStats && aiStats.remaining <= 0)}
+            >
+              {generatingAI ? (
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              ) : (
+                <Sparkles className="h-4 w-4 text-primary" />
+              )}
+              {form.watch("ai_description") ? "Regenerar com IA" : "Gerar com IA"}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 border-b border-primary/10 pb-4 relative z-10">
-          <div className="p-2 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            <Zap className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold tracking-tight bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Destaques e Inteligência Artificial
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Recursos premium para turbinar seu anúncio
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-          <FormField
-            control={form.control}
-            name="is_new"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-2xl border bg-background/40 backdrop-blur-sm p-4 hover:border-primary/30 transition-colors">
-                <div className="space-y-0.5">
-                  <FormLabel className="text-sm font-bold">
-                    Veículo Novo
-                  </FormLabel>
-                  <FormDescription className="text-xs">
-                    Zero quilômetro
-                  </FormDescription>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={loading}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="featured"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-2xl border bg-background/40 backdrop-blur-sm p-4 hover:border-primary/30 transition-colors">
-                <div className="space-y-0.5">
-                  <FormLabel className="text-sm font-bold">Destaque</FormLabel>
-                  <FormDescription className="text-xs">
-                    Exibir em áreas nobres
-                  </FormDescription>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={loading}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-
+        <div className="space-y-6">
           <FormField
             control={form.control}
             name="enable_ai_description"
             render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-2xl border bg-primary/5 p-4 border-primary/20 shadow-inner">
+              <FormItem className="flex flex-row items-center justify-between rounded-xl border p-4 bg-muted/20 border-primary/10 transition-colors hover:bg-muted/30">
                 <div className="space-y-0.5">
-                  <FormLabel className="text-sm font-bold text-primary flex items-center gap-2">
-                    IA Description
-                    <Sparkles className="h-3 w-3" />
+                  <FormLabel className="text-sm font-bold flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-yellow-500" />
+                    Utilizar Descrição Gerada por IA
                   </FormLabel>
                   <FormDescription className="text-xs">
-                    Gerar automaticamente
+                    Ative para usar o texto otimizado no anúncio.
                   </FormDescription>
                 </div>
                 <FormControl>
                   <Switch
                     checked={field.value}
                     onCheckedChange={field.onChange}
-                    disabled={loading}
+                    disabled={loading || !form.watch("ai_description")}
                   />
                 </FormControl>
               </FormItem>
             )}
           />
 
-          <div className="col-span-1 md:col-span-3">
+          <div className="grid grid-cols-1 gap-6">
             <FormField
               control={form.control}
               name="ai_description"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center gap-2 mb-2 ml-1">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Descrição IA (Apenas Leitura)
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-primary/70">
+                      Sugestão da IA
                     </FormLabel>
+                    {field.value && (
+                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase">Pronto</span>
+                    )}
                   </div>
                   <FormControl>
-                    <Textarea
-                      placeholder="A descrição profissional será gerada automaticamente com base nos dados técnicos informados na aba Geral."
-                      className="min-h-[120px] bg-muted/20 backdrop-blur-sm rounded-xl border-dashed border-2 p-4 text-muted-foreground italic text-sm cursor-not-allowed"
-                      {...field}
-                      value={field.value || ""}
-                      disabled
+                    <AIDescriptionBox
+                      text={field.value || ""}
+                      isGenerating={generatingAI}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
           </div>
         </div>
       </div>
@@ -1438,6 +1529,8 @@ function ImageCard({
   deletingId,
   isPlaceholder = false,
   isOverlay = false,
+  showControls = false,
+  onToggleControls,
 }: {
   image: any;
   index?: number;
@@ -1447,6 +1540,8 @@ function ImageCard({
   deletingId?: string | null;
   isPlaceholder?: boolean;
   isOverlay?: boolean;
+  showControls?: boolean;
+  onToggleControls?: () => void;
 }) {
   const status = image.status || "success";
   const progress = image.progress || 0;
@@ -1454,12 +1549,17 @@ function ImageCard({
 
   return (
     <div
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!isOverlay) onToggleControls?.();
+      }}
       className={cn(
-        "relative group aspect-square rounded-2xl overflow-hidden border bg-muted/30 transition-all duration-300",
+        "relative group aspect-square rounded-2xl overflow-hidden border bg-muted/30 transition-all duration-300 cursor-pointer",
         isOverlay
           ? "shadow-2xl scale-105 z-50 cursor-grabbing border-primary/50"
           : "hover:border-primary/30",
         isPlaceholder && "opacity-0",
+        showControls && "border-primary/50 ring-2 ring-primary/20",
       )}
     >
       <img
@@ -1518,12 +1618,16 @@ function ImageCard({
 
       {/* Controls */}
       {!isOverlay && !isLocal && (
-        <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-between p-3 z-30">
+        <div className={cn(
+          "absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent transition-all duration-300 flex items-end justify-between gap-1 p-3 z-30",
+          "lg:opacity-0 lg:group-hover:opacity-100 lg:pointer-events-none lg:group-hover:pointer-events-auto",
+          showControls ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}>
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-lg bg-white/10 hover:bg-destructive hover:text-white transition-colors text-white/90 border border-white/10 backdrop-blur-sm"
+            className="h-6 w-6 lg:h-8 lg:w-8 rounded-lg bg-white/10 hover:bg-destructive hover:text-white transition-colors text-white/90 border border-white/10 backdrop-blur-sm"
             onClick={(e) => {
               e.stopPropagation();
               onDelete?.(image.id);
@@ -1531,9 +1635,9 @@ function ImageCard({
             disabled={!!deletingId}
           >
             {deletingId === image.id ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-2 w-2 lg:h-3.5 lg:w-3.5 animate-spin" />
             ) : (
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-2 w-2 lg:h-3.5 lg:w-3.5" />
             )}
           </Button>
 
@@ -1542,7 +1646,7 @@ function ImageCard({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 px-3 rounded-lg bg-white/10 hover:bg-primary hover:text-primary-foreground transition-colors text-white/90 border border-white/10 backdrop-blur-sm text-[10px] font-bold uppercase tracking-wide"
+              className="h-5 lg:h-8 py-1 lg:py-1.5 px-1 lg:px-3 rounded-lg bg-white/10 hover:bg-primary hover:text-primary-foreground transition-colors text-white/90 border border-white/10 backdrop-blur-sm text-[10px] lg:text-[10px] font-bold uppercase tracking-wide"
               onClick={(e) => {
                 e.stopPropagation();
                 onSetMain?.(image.url);
@@ -1556,7 +1660,11 @@ function ImageCard({
 
       {/* Remove local image before upload */}
       {!isOverlay && isLocal && status === 'idle' && (
-        <div className="absolute top-2 right-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className={cn(
+          "absolute top-2 right-2 z-30 transition-opacity",
+          "lg:opacity-0 lg:group-hover:opacity-100 lg:pointer-events-none lg:group-hover:pointer-events-auto",
+          showControls ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}>
           <Button
             type="button"
             variant="destructive"
@@ -1582,6 +1690,8 @@ function SortableImage({
   onDelete,
   onSetMain,
   deletingId,
+  selectedImageId,
+  onToggleControls,
 }: {
   image: any;
   index: number;
@@ -1589,6 +1699,8 @@ function SortableImage({
   onDelete: (id: string) => void;
   onSetMain: (url: string) => void;
   deletingId: string | null;
+  selectedImageId: string | null;
+  onToggleControls: (id: string) => void;
 }) {
   const {
     attributes,
@@ -1602,6 +1714,7 @@ function SortableImage({
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
+    touchAction: "none",
   };
 
   return (
@@ -1620,6 +1733,8 @@ function SortableImage({
         onSetMain={onSetMain}
         deletingId={deletingId}
         isPlaceholder={isDragging}
+        showControls={selectedImageId === image.id}
+        onToggleControls={() => onToggleControls(image.id)}
       />
     </div>
   );
@@ -1645,6 +1760,7 @@ function MediaTab({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [mixedImages, setMixedImages] = useState<any[]>(images);
   const [uploading, setUploading] = useState(false);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainImageUrl = form.watch("image");
   const [dragActive, setDragActive] = useState(false);
@@ -1673,6 +1789,12 @@ function MediaTab({
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -2001,7 +2123,7 @@ function MediaTab({
               items={mixedImages.map((img) => img.id)}
               strategy={rectSortingStrategy}
             >
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
                 {mixedImages.map((image, index) => (
                   <SortableImage
                     key={image.id}
@@ -2021,6 +2143,10 @@ function MediaTab({
                       toast.success("Foto principal atualizada!");
                     }}
                     deletingId={deletingId}
+                    selectedImageId={selectedImageId}
+                    onToggleControls={(id) => {
+                      setSelectedImageId(prev => (prev === id ? null : id));
+                    }}
                   />
                 ))}
               </div>
@@ -2051,7 +2177,7 @@ function MediaTab({
         )}
 
         {/* Info Card */}
-        <div className="mt-4 p-6 rounded-2xl bg-linear-to-br from-primary/5 to-transparent border border-primary/10 flex items-start gap-4">
+        <div className="mt-4 py-2 px-2 rounded-2xl bg-linear-to-br from-primary/5 to-transparent border border-primary/10 flex items-start gap-4">
           <div className="p-2 rounded-lg bg-background shadow-sm mt-1">
             <Info className="h-4 w-4 text-primary" />
           </div>
@@ -2059,6 +2185,9 @@ function MediaTab({
             <h4 className="text-sm font-bold">Gerenciamento de Imagens</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
               As imagens selecionadas localmente podem ser reordenadas antes do envio. Clique em "Realizar Upload" para salvar permanentemente.
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Dica: Arraste novas imagens para dentro da janela e adicione-as ao veículo.
             </p>
           </div>
         </div>
