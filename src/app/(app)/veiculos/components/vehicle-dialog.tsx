@@ -125,10 +125,7 @@ const vehicleSchema = z.object({
   color: z.string().min(1, "Cor é obrigatória"),
   doors: z.coerce.number().min(1),
   body_type: z.string().min(1, "Tipo de carroceria é obrigatório"),
-  image: z
-    .string()
-    .url("URL de imagem inválida")
-    .min(1, "Imagem é obrigatória"),
+  image: z.string().url("URL de imagem inválida").optional().or(z.literal("")),
   city: z.string().min(1, "Cidade é obrigatória"),
   state: z.string().min(1, "Estado é obrigatório"),
   seller: z.string().min(1, "Vendedor é obrigatório"),
@@ -368,7 +365,7 @@ export function VehicleDialog({
             </div>
             <div>
               <DialogTitle className="text-2xl font-bold tracking-tight">
-                {isEditing ? "Editar Veículo" : "Novo Veículo"}
+                {isEditing ? `Editar Veículo #${vehicle?.id}` : "Novo Veículo"}
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground mt-1">
                 {isEditing
@@ -381,7 +378,17 @@ export function VehicleDialog({
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              const messages = Object.values(errors)
+                .map((e) => (e as any)?.message)
+                .filter(Boolean);
+              toast.error("Campos obrigatórios não preenchidos", {
+                description: messages.length
+                  ? messages.join(" • ")
+                  : "Preencha todos os campos obrigatórios.",
+                duration: 6000,
+              });
+            })}
             className="flex flex-col min-h-0 overflow-hidden"
           >
             <Tabs
@@ -402,12 +409,14 @@ export function VehicleDialog({
                   >
                     Marketplace
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="Mídia"
-                    className={"px-6 rounded-lg transition-all" + tabTheme}
-                  >
-                    Mídia
-                  </TabsTrigger>
+                  {vehicle?.id && (
+                    <TabsTrigger
+                      value="Mídia"
+                      className={"px-6 rounded-lg transition-all" + tabTheme}
+                    >
+                      Mídia
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </div>
 
@@ -429,25 +438,27 @@ export function VehicleDialog({
                 </ScrollArea>
               </TabsContent>
 
-              <TabsContent
-                className="flex-1 min-h-0 overflow-hidden p-0"
-                value="Mídia"
-              >
-                <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
-                  <MediaTab
-                    vehicleId={vehicle?.id}
-                    form={form}
-                    images={vehicleImages}
-                    onImagesChange={setVehicleImages}
-                    onImageDeleted={(id) =>
-                      setVehicleImages((prev) =>
-                        prev.filter((img) => img.id !== id),
-                      )
-                    }
-                    loading={loading}
-                  />
-                </ScrollArea>
-              </TabsContent>
+              {vehicle?.id && (
+                <TabsContent
+                  className="flex-1 min-h-0 overflow-hidden p-0"
+                  value="Mídia"
+                >
+                  <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
+                    <MediaTab
+                      vehicleId={vehicle?.id}
+                      form={form}
+                      images={vehicleImages}
+                      onImagesChange={setVehicleImages}
+                      onImageDeleted={(id) =>
+                        setVehicleImages((prev) =>
+                          prev.filter((img) => img.id !== id),
+                        )
+                      }
+                      loading={loading}
+                    />
+                  </ScrollArea>
+                </TabsContent>
+              )}
             </Tabs>
 
             <DialogFooter className="shrink-0 px-8 py-4 border-t bg-card/50 backdrop-blur-md mt-auto">
@@ -607,7 +618,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="status"
             render={({ field }) => (
               <FormItem className="flex flex-row items-center gap-3 min-w-[200px]">
-                <FormLabel className="text-sm font-semibold shrink-0">
+                <FormLabel className={cn(
+                  "text-sm font-semibold shrink-0",
+                  form.formState.errors.status && "text-destructive"
+                )}>
                   Status *
                 </FormLabel>
                 <div className="flex-1">
@@ -617,7 +631,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     disabled={loading}
                   >
                     <FormControl>
-                      <SelectTrigger className="bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-9">
+                      <SelectTrigger className={cn(
+                        "bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-9",
+                        form.formState.errors.status && "border-destructive ring-1 ring-destructive"
+                      )}>
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                     </FormControl>
@@ -641,7 +658,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="brand"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.brand && "text-destructive"
+                )}>
                   Marca *
                 </FormLabel>
                 <FormControl>
@@ -649,7 +669,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     placeholder="Ex: Toyota"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.brand && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -662,7 +685,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="model"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.model && "text-destructive"
+                )}>
                   Modelo *
                 </FormLabel>
                 <FormControl>
@@ -670,7 +696,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     placeholder="Ex: Corolla"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.model && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -683,7 +712,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="version"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.version && "text-destructive"
+                )}>
                   Versão *
                 </FormLabel>
                 <FormControl>
@@ -691,7 +723,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     placeholder="Ex: XEI 2.0"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.version && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -704,14 +739,20 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="plate"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.plate && "text-destructive"
+                )}>
                   Placa *
                 </FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: ABC1234"
                     {...field}
-                    className="uppercase bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "uppercase bg-background/50 rounded-lg h-10",
+                      form.formState.errors.plate && "border-destructive ring-1 ring-destructive"
+                    )}
                     disabled={loading}
                   />
                 </FormControl>
@@ -725,7 +766,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="year"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.year && "text-destructive"
+                )}>
                   Ano Fabr. *
                 </FormLabel>
                 <FormControl>
@@ -733,7 +777,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     type="number"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.year && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -746,7 +793,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="year_model"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.year_model && "text-destructive"
+                )}>
                   Ano Modelo *
                 </FormLabel>
                 <FormControl>
@@ -754,7 +804,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     type="number"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.year_model && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -786,7 +839,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-primary">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-primary",
+                  form.formState.errors.price && "text-destructive"
+                )}>
                   Preço (R$) *
                 </FormLabel>
                 <FormControl>
@@ -795,7 +851,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     step="0.01"
                     {...field}
                     disabled={loading}
-                    className="bg-primary/5 border-primary/20 rounded-lg h-10 font-semibold"
+                    className={cn(
+                      "bg-primary/5 border-primary/20 rounded-lg h-10 font-semibold",
+                      form.formState.errors.price && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -897,7 +956,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="fuel"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.fuel && "text-destructive"
+                )}>
                   Combustível *
                 </FormLabel>
                 <Select
@@ -906,7 +968,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                   disabled={loading}
                 >
                   <FormControl>
-                    <SelectTrigger className="bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10">
+                    <SelectTrigger className={cn(
+                      "bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10",
+                      form.formState.errors.fuel && "border-destructive ring-1 ring-destructive"
+                    )}>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   </FormControl>
@@ -929,7 +994,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="transmission"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.transmission && "text-destructive"
+                )}>
                   Transmissão *
                 </FormLabel>
                 <Select
@@ -938,7 +1006,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                   disabled={loading}
                 >
                   <FormControl>
-                    <SelectTrigger className="bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10">
+                    <SelectTrigger className={cn(
+                      "bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10",
+                      form.formState.errors.transmission && "border-destructive ring-1 ring-destructive"
+                    )}>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   </FormControl>
@@ -959,7 +1030,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="color"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.color && "text-destructive"
+                )}>
                   Cor *
                 </FormLabel>
                 <FormControl>
@@ -967,7 +1041,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     placeholder="Ex: Branco"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.color && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -980,7 +1057,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="doors"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.doors && "text-destructive"
+                )}>
                   Portas *
                 </FormLabel>
                 <FormControl>
@@ -988,7 +1068,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     type="number"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.doors && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -1001,7 +1084,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="body_type"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.body_type && "text-destructive"
+                )}>
                   Carroceria *
                 </FormLabel>
                 <Select
@@ -1010,7 +1096,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                   disabled={loading}
                 >
                   <FormControl>
-                    <SelectTrigger className="bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10">
+                    <SelectTrigger className={cn(
+                      "bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10",
+                      form.formState.errors.body_type && "border-destructive ring-1 ring-destructive"
+                    )}>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   </FormControl>
@@ -1051,7 +1140,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="city"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.city && "text-destructive"
+                )}>
                   Cidade *
                 </FormLabel>
                 <FormControl>
@@ -1059,7 +1151,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     placeholder="Ex: São Paulo"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.city && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -1072,7 +1167,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             name="state"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.state && "text-destructive"
+                )}>
                   Estado (UF) *
                 </FormLabel>
                 <FormControl>
@@ -1080,7 +1178,10 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     placeholder="Ex: SP"
                     maxLength={2}
                     {...field}
-                    className="uppercase bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "uppercase bg-background/50 rounded-lg h-10",
+                      form.formState.errors.state && "border-destructive ring-1 ring-destructive"
+                    )}
                     disabled={loading}
                   />
                 </FormControl>
@@ -1119,7 +1220,10 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
             name="seller"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.seller && "text-destructive"
+                )}>
                   Vendedor *
                 </FormLabel>
                 <FormControl>
@@ -1127,7 +1231,10 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
                     placeholder="Nome do vendedor"
                     {...field}
                     disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
+                    className={cn(
+                      "bg-background/50 rounded-lg h-10",
+                      form.formState.errors.seller && "border-destructive ring-1 ring-destructive"
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -1140,7 +1247,10 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
             name="seller_type"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  form.formState.errors.seller_type && "text-destructive"
+                )}>
                   Tipo de Vendedor *
                 </FormLabel>
                 <Select
@@ -1149,7 +1259,10 @@ function MarketplaceTab({ form, loading }: { form: any; loading: boolean }) {
                   disabled={loading}
                 >
                   <FormControl>
-                    <SelectTrigger className="bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10">
+                    <SelectTrigger className={cn(
+                      "bg-background/50 rounded-lg border-primary/10 hover:border-primary transition-colors h-10",
+                      form.formState.errors.seller_type && "border-destructive ring-1 ring-destructive"
+                    )}>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   </FormControl>
@@ -1622,7 +1735,7 @@ function MediaTab({
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (e.type === "dragenter") {
       dragCounter.current++;
       setDragActive(true);
@@ -1969,7 +2082,7 @@ function MediaTab({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-3 sm:gap-4 mt-2">
-              <AlertDialogCancel 
+              <AlertDialogCancel
                 className="rounded-xl border-primary/10 hover:bg-muted transition-colors px-6"
                 onClick={() => setConfirmDeleteId(null)}
               >
