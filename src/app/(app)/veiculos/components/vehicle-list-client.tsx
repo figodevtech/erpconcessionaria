@@ -240,7 +240,11 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
                   ) : (
                     vehicles.map((vehicle: Vehicle) => (
                       <div key={vehicle.id} className="h-full">
-                        <VehicleCard vehicle={vehicle} />
+                        <VehicleCard
+                          vehicle={vehicle}
+                          onEdit={handleEditVehicle}
+                          onDeleteSuccess={() => fetchVehicles()}
+                        />
                       </div>
                     ))
                   )}
