@@ -37,6 +37,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Loader2,
@@ -110,6 +118,7 @@ import { AIDescriptionBox } from "./ai-description-box";
 import { formatCurrency, parseCurrency } from "@/lib/utils";
 
 export interface VehicleFormValues {
+  type: string;
   brand: string;
   model: string;
   version: string;
@@ -165,6 +174,7 @@ export function VehicleDialog({
 
   const form = useForm<VehicleFormValues>({
     defaultValues: {
+      type: "cars",
       brand: "",
       model: "",
       version: "",
@@ -229,6 +239,7 @@ export function VehicleDialog({
         if (updatedVehicle) {
           setVehicleImages(updatedVehicle.vehicle_images || []);
           form.reset({
+            type: updatedVehicle.type || "cars",
             brand: updatedVehicle.brand || "",
             model: updatedVehicle.model || "",
             version: updatedVehicle.version || "",
@@ -272,6 +283,7 @@ export function VehicleDialog({
       loadVehicleData();
     } else if (open && !vehicle) {
       form.reset({
+        type: "cars",
         brand: "",
         model: "",
         version: "",
@@ -305,8 +317,95 @@ export function VehicleDialog({
     }
   }, [open, vehicle?.id, form]);
 
+  // FIPE States
+  const [fipeBrands, setFipeBrands] = useState<{ code: string, name: string }[]>([]);
+  const [fipeModels, setFipeModels] = useState<{ code: string, name: string }[]>([]);
+  const [fipeBaseModels, setFipeBaseModels] = useState<string[]>([]);
+  const [fipeVersions, setFipeVersions] = useState<string[]>([]);
+  const [loadingFipe, setLoadingFipe] = useState(false);
+
+  // Combobox Filtering States
+  const [brandSearch, setBrandSearch] = useState("");
+  const [modelSearch, setModelSearch] = useState("");
+  const [versionSearch, setVersionSearch] = useState("");
+
+  const typeValue = form.watch("type");
+  const brandValue = form.watch("brand");
+  const modelValue = form.watch("model");
+
+  useEffect(() => {
+    async function fetchBrands() {
+      if (!typeValue) return;
+      setLoadingFipe(true);
+      try {
+        const res = await fetch(`https://fipe.parallelum.com.br/api/v2/${typeValue}/brands`);
+        const data = await res.json();
+        setFipeBrands(data);
+      } catch (error) {
+        console.error("Error fetching FIPE brands:", error);
+      } finally {
+        setLoadingFipe(false);
+      }
+    }
+    fetchBrands();
+  }, [typeValue]);
+
+  useEffect(() => {
+    async function fetchModels() {
+      if (!brandValue || fipeBrands.length === 0) {
+        setFipeModels([]);
+        setFipeBaseModels([]);
+        setFipeVersions([]);
+        return;
+      }
+      const selectedBrand = fipeBrands.find(b => b.name.toLowerCase() === brandValue.toLowerCase());
+      if (!selectedBrand) {
+        return;
+      }
+
+      setLoadingFipe(true);
+      try {
+        const res = await fetch(`https://fipe.parallelum.com.br/api/v2/${typeValue}/brands/${selectedBrand.code}/models`);
+        const data = await res.json();
+        setFipeModels(data);
+
+        // Derive base models: first word
+        const bases = new Set<string>();
+        data.forEach((m: any) => {
+          const firstWord = m.name.split(" ")[0];
+          bases.add(firstWord);
+        });
+        setFipeBaseModels(Array.from(bases).sort());
+      } catch (error) {
+        console.error("Error fetching FIPE models:", error);
+      } finally {
+        setLoadingFipe(false);
+      }
+    }
+    fetchModels();
+  }, [typeValue, brandValue, fipeBrands]);
+
+  useEffect(() => {
+    if (!modelValue || fipeModels.length === 0) {
+      setFipeVersions([]);
+      return;
+    }
+
+    // Extract versions from models that start with the base model
+    const versions = new Set<string>();
+    fipeModels.forEach(m => {
+      if (m.name.startsWith(modelValue + " ") || m.name === modelValue) {
+        let versionText = m.name.substring(modelValue.length).trim();
+        if (!versionText) versionText = "Standard";
+        versions.add(versionText);
+      }
+    });
+    setFipeVersions(Array.from(versions).sort());
+  }, [modelValue, fipeModels]);
+
   async function onSubmit(values: VehicleFormValues) {
     const requiredFields = [
+      { key: "type", label: "Tipo" },
       { key: "brand", label: "Marca" },
       { key: "model", label: "Modelo" },
       { key: "version", label: "Versão" },
@@ -514,7 +613,15 @@ export function VehicleDialog({
                 value="Geral"
               >
                 <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
-                  <GeneralTab form={form} loading={loading} />
+                  <GeneralTab
+                    form={form}
+                    loading={loading}
+                    fipeBrands={fipeBrands}
+                    fipeModels={fipeModels}
+                    fipeBaseModels={fipeBaseModels}
+                    fipeVersions={fipeVersions}
+                    loadingFipe={loadingFipe}
+                  />
                 </ScrollArea>
               </TabsContent>
 
@@ -588,7 +695,83 @@ export function VehicleDialog({
   );
 }
 
-function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
+function GeneralTab({
+  form,
+  loading,
+  fipeBrands,
+  fipeModels,
+  fipeBaseModels,
+  fipeVersions,
+  loadingFipe
+}: {
+  form: any;
+  loading: boolean;
+  fipeBrands: { code: string, name: string }[];
+  fipeModels: { code: string, name: string }[];
+  fipeBaseModels: string[];
+  fipeVersions: string[];
+  loadingFipe: boolean;
+}) {
+  const [brandSearch, setBrandSearch] = useState("");
+  const [modelSearch, setModelSearch] = useState("");
+  const [versionSearch, setVersionSearch] = useState("");
+  const [loadingFipePrice, setLoadingFipePrice] = useState(false);
+
+  const filteredBrands = fipeBrands.filter(b => b.name.toLowerCase().includes(brandSearch.toLowerCase()));
+  const filteredModels = fipeBaseModels.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()));
+  const filteredVersions = fipeVersions.filter(v => v.toLowerCase().includes(versionSearch.toLowerCase()));
+
+  const fetchFipePrice = async () => {
+    const type = form.getValues("type") || "cars";
+    const brandName = form.getValues("brand");
+    const modelName = form.getValues("model");
+    const versionName = form.getValues("version");
+    const yearModel = form.getValues("year_model");
+
+    if (!brandName || !modelName || !versionName || !yearModel) {
+      toast.error("Preencha Marca, Modelo, Versão e Ano Modelo para buscar a Fipe.");
+      return;
+    }
+
+    try {
+      setLoadingFipePrice(true);
+
+      const brandObj = fipeBrands.find((b) => b.name === brandName);
+      if (!brandObj) throw new Error("Marca não encontrada nos registros de base da FIPE.");
+
+      const exactFipeName = modelName === versionName ? modelName : `${modelName} ${versionName}`;
+      const modelObj = fipeModels.find(m => m.name === exactFipeName);
+      if (!modelObj) throw new Error("Combinação exata de Modelo/Versão não encontrada.");
+
+      const yearsRes = await fetch(`https://fipe.parallelum.com.br/api/v2/${type}/brands/${brandObj.code}/models/${modelObj.code}/years`);
+      if (!yearsRes.ok) throw new Error("Erro ao consultar anos base para essa versão.");
+      const yearsData: { code: string, name: string }[] = await yearsRes.json();
+
+      const yearStr = String(yearModel);
+      const yearObj = yearsData.find(y => y.code.startsWith(yearStr) || y.name.includes(yearStr));
+      if (!yearObj) throw new Error("Ano compatível não foi localizado na tabela FIPE.");
+
+      const priceRes = await fetch(`https://fipe.parallelum.com.br/api/v2/${type}/brands/${brandObj.code}/models/${modelObj.code}/years/${yearObj.code}`);
+      if (!priceRes.ok) throw new Error("Erro ao recuperar a avaliação de preço FIPE.");
+      const priceData = await priceRes.json();
+
+      if (priceData && priceData.price) {
+        // "R$ 10.000,00" -> 10000.00
+        const cleanPriceString = priceData.price.replace(/[^\d,]/g, '').replace(',', '.');
+        const priceNumber = parseFloat(cleanPriceString);
+        if (!isNaN(priceNumber)) {
+           form.setValue("fipe", priceNumber, { shouldValidate: true, shouldDirty: true });
+           toast.success("Preço base da FIPE preenchido!");
+        }
+      }
+    } catch (error: any) {
+      console.error("FIPE Price Error:", error);
+      toast.error(error.message || "Erro indetectado ao comunicar com FIPE.");
+    } finally {
+      setLoadingFipePrice(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 p-1">
       {/* Veículo Profile Section */}
@@ -769,26 +952,81 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <FormField
             control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Tipo *
+                </FormLabel>
+                <Select
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    form.setValue("brand", "");
+                    form.setValue("model", "");
+                    form.setValue("version", "");
+                  }}
+                  value={field.value === "cars" ? "Carros/Utilitários/SUV" : field.value === "motorcycles" ? "Motos" : field.value === "trucks" ? "Caminhões" : ""}
+                  disabled={loading || loadingFipe}
+                >
+                  <FormControl>
+                    <SelectTrigger className={cn(
+                      "bg-background/50 rounded-lg h-10 w-full",
+                      form.formState.errors.type && "border-destructive ring-1 ring-destructive"
+                    )}>
+                      <SelectValue placeholder="Selecione Categoria" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectItem value="cars">Carros/Utilitários/SUV</SelectItem>
+                    <SelectItem value="motorcycles">Motos</SelectItem>
+                    <SelectItem value="trucks">Caminhões</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="brand"
             render={({ field }) => (
               <FormItem>
                 <FormLabel className={cn(
-                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground flex justify-between",
                   form.formState.errors.brand && "text-destructive"
                 )}>
-                  Marca *
+                  <span>Marca *</span>
+                  {loadingFipe && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
                 </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Ex: Toyota"
-                    {...field}
-                    disabled={loading}
-                    className={cn(
-                      "bg-background/50 rounded-lg h-10",
-                      form.formState.errors.brand && "border-destructive ring-1 ring-destructive"
-                    )}
-                  />
-                </FormControl>
+                <Combobox
+                  items={filteredBrands.map(b => b.name)}
+                  value={field.value}
+                  inputValue={brandSearch}
+                  onInputValueChange={setBrandSearch}
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    form.setValue("model", "");
+                    form.setValue("version", "");
+                  }}
+                  disabled={loading || loadingFipe || fipeBrands.length === 0}
+                >
+                  <FormControl>
+                    <ComboboxInput
+                      placeholder={loadingFipe ? "Carregando..." : "Selecione a Marca"}
+                      className={cn("bg-background/50 rounded-lg h-10 w-full", form.formState.errors.brand && "border-destructive ring-1 ring-destructive")}
+                    />
+                  </FormControl>
+                  <ComboboxContent>
+                    <ComboboxEmpty>Nenhuma marca encontrada.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(item: string) => (
+                        <ComboboxItem key={item} value={item}>
+                          {item}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
               </FormItem>
             )}
           />
@@ -799,22 +1037,40 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className={cn(
-                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground flex justify-between",
                   form.formState.errors.model && "text-destructive"
                 )}>
-                  Modelo *
+                  <span>Modelo *</span>
+                  {loadingFipe && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
                 </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Ex: Corolla"
-                    {...field}
-                    disabled={loading}
-                    className={cn(
-                      "bg-background/50 rounded-lg h-10",
-                      form.formState.errors.model && "border-destructive ring-1 ring-destructive"
-                    )}
-                  />
-                </FormControl>
+                <Combobox
+                  items={filteredModels}
+                  value={field.value}
+                  inputValue={modelSearch}
+                  onInputValueChange={setModelSearch}
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    form.setValue("version", "");
+                  }}
+                  disabled={loading || loadingFipe || fipeBaseModels.length === 0}
+                >
+                  <FormControl>
+                    <ComboboxInput
+                      placeholder={loadingFipe ? "Carregando..." : "Selecione o Modelo"}
+                      className={cn("bg-background/50 rounded-lg h-10 w-full", form.formState.errors.model && "border-destructive ring-1 ring-destructive")}
+                    />
+                  </FormControl>
+                  <ComboboxContent>
+                    <ComboboxEmpty>Nenhum modelo encontrado.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(item: string) => (
+                        <ComboboxItem key={item} value={item}>
+                          {item}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
               </FormItem>
             )}
           />
@@ -823,24 +1079,38 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
             control={form.control}
             name="version"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="col-span-1 md:col-span-2 lg:col-span-1">
                 <FormLabel className={cn(
-                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                  "text-xs font-bold uppercase tracking-wider text-muted-foreground flex justify-between",
                   form.formState.errors.version && "text-destructive"
                 )}>
-                  Versão *
+                  <span>Versão *</span>
                 </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Ex: XEI 2.0"
-                    {...field}
-                    disabled={loading}
-                    className={cn(
-                      "bg-background/50 rounded-lg h-10",
-                      form.formState.errors.version && "border-destructive ring-1 ring-destructive"
-                    )}
-                  />
-                </FormControl>
+                <Combobox
+                  items={filteredVersions}
+                  value={field.value}
+                  inputValue={versionSearch}
+                  onInputValueChange={setVersionSearch}
+                  onValueChange={field.onChange}
+                  disabled={loading || loadingFipe || fipeVersions.length === 0}
+                >
+                  <FormControl>
+                    <ComboboxInput
+                      placeholder={loadingFipe ? "Carregando..." : "Selecione a Versão"}
+                      className={cn("bg-background/50 rounded-lg h-10 w-full", form.formState.errors.version && "border-destructive ring-1 ring-destructive")}
+                    />
+                  </FormControl>
+                  <ComboboxContent>
+                    <ComboboxEmpty>Nenhuma versão encontrada.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(item: string) => (
+                        <ComboboxItem key={item} value={item}>
+                          {item}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
               </FormItem>
             )}
           />
@@ -858,13 +1128,19 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                 </FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Ex: ABC1234"
+                    placeholder="Ex: ABC-1234"
                     {...field}
+                    value={field.value ? (field.value.length > 3 ? `${field.value.substring(0, 3)}-${field.value.substring(3, 7)}` : field.value) : ""}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/-/g, "").toUpperCase().substring(0, 7);
+                      field.onChange(rawValue);
+                    }}
                     className={cn(
                       "uppercase bg-background/50 rounded-lg h-10",
                       form.formState.errors.plate && "border-destructive ring-1 ring-destructive"
                     )}
                     disabled={loading}
+                    maxLength={8}
                   />
                 </FormControl>
               </FormItem>
@@ -989,21 +1265,33 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                   FIPE (R$)
                 </FormLabel>
                 <FormControl>
-                  <Input
-                    type="text"
-                    disabled={loading}
-                    className="bg-background/50 rounded-lg h-10"
-                    value={field.value ? formatCurrency(field.value) : ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const numericValue = value.replace(/\D/g, "");
-                      if (numericValue) {
-                        field.onChange(Number(numericValue) / 100);
-                      } else {
-                        field.onChange(0);
-                      }
-                    }}
-                  />
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      disabled={loading}
+                      className="bg-background/50 rounded-lg h-10"
+                      value={field.value ? formatCurrency(field.value) : ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const numericValue = value.replace(/\D/g, "");
+                        if (numericValue) {
+                          field.onChange(Number(numericValue) / 100);
+                        } else {
+                          field.onChange(0);
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="absolute top-1 right-1"
+                      onClick={fetchFipePrice}
+                      disabled={loading || loadingFipePrice}
+                    >
+                      {loadingFipePrice ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Search className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </FormControl>
               </FormItem>
             )}
@@ -1413,7 +1701,7 @@ function MarketplaceTab({ form, loading, onGenerateAI, generatingAI, aiStats }: 
                       disabled={loading}
                     />
                   </FormControl>
-                  </FormItem>
+                </FormItem>
               )}
             />
           </div>
