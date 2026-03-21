@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +26,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -112,44 +109,36 @@ import {
 import { AIDescriptionBox } from "./ai-description-box";
 import { formatCurrency, parseCurrency } from "@/lib/utils";
 
-const vehicleSchema = z.object({
-  brand: z.string().min(1, "Marca é obrigatória"),
-  model: z.string().min(1, "Modelo é obrigatório"),
-  version: z.string().min(1, "Versão é obrigatória"),
-  year: z.coerce
-    .number()
-    .min(1900)
-    .max(new Date().getFullYear() + 1),
-  year_model: z.coerce
-    .number()
-    .min(1900)
-    .max(new Date().getFullYear() + 1),
-  price: z.coerce.number().min(0),
-  fipe: z.coerce.number().optional().nullable(),
-  mileage: z.coerce.number().optional().nullable(),
-  fuel: z.string().min(1, "Combustível é obrigatório"),
-  transmission: z.string().min(1, "Transmissão é obrigatória"),
-  color: z.string().min(1, "Cor é obrigatória"),
-  doors: z.coerce.number().min(1),
-  body_type: z.string().min(1, "Tipo de carroceria é obrigatório"),
-  image: z.string().url("URL de imagem inválida").optional().or(z.literal("")),
-  city: z.string().min(1, "Cidade é obrigatória"),
-  state: z.string().min(1, "Estado é obrigatório"),
-  seller: z.string().min(1, "Vendedor é obrigatório"),
-  seller_type: z.enum(["dealership", "store", "private"]),
-  features: z.array(z.string()).default([]),
-  description: z.string().min(1, "Descrição é obrigatória"),
-  enable_ai_description: z.boolean().default(false),
-  ai_description: z.string().optional().nullable(),
-  engine_size: z.string().optional().nullable(),
-  horsepower: z.coerce.number().optional().nullable(),
-  is_new: z.boolean().default(false),
-  status: z.enum(["Em venda", "Vendido", "Rascunho", "Pagamento"]),
-  featured: z.boolean().default(false),
-  plate: z.string().min(1, "Placa é obrigatória"),
-});
-
-type VehicleFormValues = z.infer<typeof vehicleSchema>;
+export interface VehicleFormValues {
+  brand: string;
+  model: string;
+  version: string;
+  year: number | "";
+  year_model: number | "";
+  price: number;
+  fipe?: number | null;
+  mileage?: number | null;
+  fuel: string;
+  transmission: string;
+  color: string;
+  doors: number | "";
+  body_type: string;
+  image?: string;
+  city: string;
+  state: string;
+  seller: string;
+  seller_type: "dealership" | "store" | "private";
+  features: string[];
+  description: string;
+  enable_ai_description: boolean;
+  ai_description?: string | null;
+  engine_size?: string | null;
+  horsepower?: number | null;
+  is_new: boolean;
+  status: "Em venda" | "Vendido" | "Rascunho" | "Pagamento";
+  featured: boolean;
+  plate: string;
+}
 
 interface VehicleDialogProps {
   open: boolean;
@@ -175,7 +164,6 @@ export function VehicleDialog({
   const isEditing = !!vehicle;
 
   const form = useForm<VehicleFormValues>({
-    resolver: zodResolver(vehicleSchema),
     defaultValues: {
       brand: "",
       model: "",
@@ -318,6 +306,49 @@ export function VehicleDialog({
   }, [open, vehicle?.id, form]);
 
   async function onSubmit(values: VehicleFormValues) {
+    const requiredFields = [
+      { key: "brand", label: "Marca" },
+      { key: "model", label: "Modelo" },
+      { key: "version", label: "Versão" },
+      { key: "year", label: "Ano Fabr." },
+      { key: "year_model", label: "Ano Modelo" },
+      { key: "price", label: "Preço" },
+      { key: "fuel", label: "Combustível" },
+      { key: "transmission", label: "Transmissão" },
+      { key: "color", label: "Cor" },
+      { key: "doors", label: "Portas" },
+      { key: "body_type", label: "Carroceria" },
+      { key: "city", label: "Cidade" },
+      { key: "state", label: "Estado" },
+      { key: "seller", label: "Vendedor" },
+      { key: "description", label: "Descrição" },
+      { key: "plate", label: "Placa" },
+      { key: "status", label: "Status" },
+    ] as const;
+
+    let hasError = false;
+    const errorMessages: string[] = [];
+
+    form.clearErrors();
+
+    requiredFields.forEach((field) => {
+      const value = values[field.key as keyof VehicleFormValues];
+      if (value === undefined || value === null || value === "") {
+        if (field.key === "price" && (value as any) === 0) return; // Special case: Allow 0 price
+        form.setError(field.key as any, { type: "manual", message: `${field.label} é obrigatório(a)` });
+        errorMessages.push(`${field.label} é obrigatório(a)`);
+        hasError = true;
+      }
+    });
+
+    if (hasError) {
+      toast.error("Campos obrigatórios não preenchidos", {
+        description: errorMessages.slice(0, 3).join(" • ") + (errorMessages.length > 3 ? "..." : ""),
+        duration: 6000,
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const url = "/api/vehicles";
@@ -446,17 +477,7 @@ export function VehicleDialog({
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit, (errors) => {
-              const messages = Object.values(errors)
-                .map((e) => (e as any)?.message)
-                .filter(Boolean);
-              toast.error("Campos obrigatórios não preenchidos", {
-                description: messages.length
-                  ? messages.join(" • ")
-                  : "Preencha todos os campos obrigatórios.",
-                duration: 6000,
-              });
-            })}
+            onSubmit={form.handleSubmit(onSubmit)}
             className="flex flex-col min-h-0 overflow-hidden"
           >
             <Tabs
@@ -740,7 +761,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     </SelectContent>
                   </Select>
                 </div>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -769,7 +789,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     )}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -796,7 +815,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     )}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -823,7 +841,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     )}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -850,7 +867,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     disabled={loading}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -878,7 +894,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     )}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -906,7 +921,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     )}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -962,7 +976,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     }}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -992,7 +1005,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     }}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1014,7 +1026,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     className="bg-background/50 rounded-lg h-10"
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1036,7 +1047,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     className="bg-background/50 rounded-lg h-10"
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1058,7 +1068,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     className="bg-background/50 rounded-lg h-10"
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1096,7 +1105,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     <SelectItem value="Elétrico">Elétrico</SelectItem>
                   </SelectContent>
                 </Select>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1132,7 +1140,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     <SelectItem value="Automatizado">Automatizado</SelectItem>
                   </SelectContent>
                 </Select>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1159,7 +1166,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     )}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1186,7 +1192,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     )}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1225,7 +1230,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     <SelectItem value="Van">Van</SelectItem>
                   </SelectContent>
                 </Select>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1262,7 +1266,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     placeholder="Ex: Teto Solar, Banco de Couro, Câmera de Ré..."
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             </div>
           )}
@@ -1305,7 +1308,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     )}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1333,7 +1335,6 @@ function GeneralTab({ form, loading }: { form: any; loading: boolean }) {
                     disabled={loading}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1369,7 +1370,6 @@ function MarketplaceTab({ form, loading, onGenerateAI, generatingAI, aiStats }: 
                 <FormControl>
                   <Input placeholder="Nome do vendedor" {...field} disabled={loading} className="bg-background/50 h-10 rounded-lg" />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1392,7 +1392,6 @@ function MarketplaceTab({ form, loading, onGenerateAI, generatingAI, aiStats }: 
                     <SelectItem value="private">Particular</SelectItem>
                   </SelectContent>
                 </Select>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -1414,8 +1413,7 @@ function MarketplaceTab({ form, loading, onGenerateAI, generatingAI, aiStats }: 
                       disabled={loading}
                     />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
+                  </FormItem>
               )}
             />
           </div>
@@ -1508,7 +1506,6 @@ function MarketplaceTab({ form, loading, onGenerateAI, generatingAI, aiStats }: 
                       isGenerating={generatingAI}
                     />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
