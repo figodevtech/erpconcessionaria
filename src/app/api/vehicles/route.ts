@@ -47,8 +47,20 @@ export async function GET(request: Request) {
 
     const totalPages = count ? Math.ceil(count / limit) : 0;
 
+    // Enforce sort_order for vehicle images since Supabase nested relationship fetches do not guarantee order
+    const formattedData = data?.map(vehicle => {
+      let sortedImages = vehicle.vehicle_images;
+      if (Array.isArray(sortedImages)) {
+        sortedImages = [...sortedImages].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      }
+      return {
+        ...vehicle,
+        vehicle_images: sortedImages
+      };
+    }) || [];
+
     return NextResponse.json({
-      data: data || [],
+      data: formattedData,
       meta: {
         total: count || 0,
         page,

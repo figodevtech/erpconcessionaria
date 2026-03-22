@@ -712,10 +712,26 @@ function GeneralTab({
   fipeVersions: string[];
   loadingFipe: boolean;
 }) {
-  const [brandSearch, setBrandSearch] = useState("");
-  const [modelSearch, setModelSearch] = useState("");
-  const [versionSearch, setVersionSearch] = useState("");
+  const brandVal = form.watch("brand");
+  const modelVal = form.watch("model");
+  const versionVal = form.watch("version");
+
+  const [brandSearch, setBrandSearch] = useState(brandVal || "");
+  const [modelSearch, setModelSearch] = useState(modelVal || "");
+  const [versionSearch, setVersionSearch] = useState(versionVal || "");
   const [loadingFipePrice, setLoadingFipePrice] = useState(false);
+
+  useEffect(() => {
+    setBrandSearch(brandVal || "");
+  }, [brandVal]);
+
+  useEffect(() => {
+    setModelSearch(modelVal || "");
+  }, [modelVal]);
+
+  useEffect(() => {
+    setVersionSearch(versionVal || "");
+  }, [versionVal]);
 
   const filteredBrands = fipeBrands.filter(b => b.name.toLowerCase().includes(brandSearch.toLowerCase()));
   const filteredModels = fipeBaseModels.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()));
