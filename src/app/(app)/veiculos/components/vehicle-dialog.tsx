@@ -2094,10 +2094,11 @@ function VideoCard({
 }
 
 function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" | "wide" }) {
-  const [videoFile, setVideoFile] = useState<{ url: string; path: string } | null>(null);
+  const [videoFile, setVideoFile] = useState<{ id?: string, url: string; path: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
   const folderPath = `${vehicleId}/videos/${type}`;
@@ -2109,14 +2110,17 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
     }
     setLoading(true);
     try {
-      const { data, error } = await supabase.storage.from("vehicles").list(folderPath);
-      if (error) throw error;
-      
-      const file = data?.find(f => !f.name.startsWith('.emptyFolderPlaceholder'));
-      if (file) {
-        const path = `${folderPath}/${file.name}`;
-        const { data: { publicUrl } } = supabase.storage.from("vehicles").getPublicUrl(path);
-        setVideoFile({ url: publicUrl, path });
+      const response = await fetch(`/api/vehicles/videos?vehicleId=${vehicleId}`);
+      if (!response.ok) throw new Error("Falha ao buscar vídeos no banco");
+      const videos = await response.json();
+      const videoRecord = videos.find((v: { id: string; url: string; type: string }) => v.type === type);
+
+      if (videoRecord) {
+        // Obter o path do bucket através da decodificação da URL pública do supabase (removendo a base URL até o final do nome do bucket)
+        const pathMatch = videoRecord.url.match(/vehicles\/(.+)/);
+        const path = pathMatch ? decodeURIComponent(pathMatch[1]) : `${folderPath}/`;
+        
+        setVideoFile({ id: videoRecord.id, url: videoRecord.url, path });
       } else {
         setVideoFile(null);
       }
@@ -2169,7 +2173,26 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
         .from('vehicles')
         .getPublicUrl(filePath);
 
-      setVideoFile({ url: publicUrl, path: filePath });
+      // Register the video in our DB via API
+      const apiResponse = await fetch('/api/vehicles/videos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          vehicle_id: vehicleId,
+          url: publicUrl,
+          type
+        }),
+      });
+
+      if (!apiResponse.ok) {
+        throw new Error("Falha ao registrar vídeo na base de dados");
+      }
+
+      const record = await apiResponse.json();
+
+      setVideoFile({ id: record.id, url: publicUrl, path: filePath });
       toast.success(`Vídeo ${type === 'shorts' ? 'Short' : 'de Apresentação'} enviado com sucesso!`);
     } catch (error) {
       console.error('Upload error:', error);
@@ -2185,6 +2208,16 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
     
     try {
       setDeleting(true);
+      
+      // Delete from DB first
+      if (videoFile.id) {
+        const response = await fetch(`/api/vehicles/videos?id=${videoFile.id}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) throw new Error("Erro ao remover registro do banco");
+      }
+
+      // Delete from Storage
       const { error } = await supabase.storage.from("vehicles").remove([videoFile.path]);
       if (error) throw error;
       
@@ -2226,12 +2259,48 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
       </div>
 
       {videoFile ? (
-        <VideoCard
-          videoUrl={videoFile.url}
-          type={type}
-          onDelete={handleDelete}
-          deleting={deleting}
-        />
+        <>
+          <VideoCard
+            videoUrl={videoFile.url}
+            type={type}
+            onDelete={() => setShowDeleteAlert(true)}
+            deleting={deleting}
+          />
+          
+          <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+            <AlertDialogContent className="rounded-3xl border-primary/10 shadow-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  Confirmar Exclusão
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm py-2">
+                  Tem certeza que deseja remover este vídeo? Esta ação não pode ser
+                  desfeita e o arquivo será excluído permanentemente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-3 sm:gap-4 mt-2">
+                <AlertDialogCancel
+                  onClick={() => setShowDeleteAlert(false)}
+                  className="rounded-xl border-primary/10 hover:bg-muted transition-colors px-6"
+                >
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  className="rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors shadow-lg shadow-destructive/20 px-6"
+                  onClick={() => {
+                    setShowDeleteAlert(false);
+                    handleDelete();
+                  }}
+                >
+                  Excluir Permanentemente
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       ) : (
         <div 
           onClick={() => !uploading && fileInputRef.current?.click()}
