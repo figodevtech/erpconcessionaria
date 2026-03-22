@@ -81,6 +81,9 @@ import {
   ChevronDown,
   ChevronUp,
   Cog,
+  Video,
+  MonitorPlay,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -2041,6 +2044,233 @@ function SortableImage({
   );
 }
 
+function VideoCard({
+  videoUrl,
+  type,
+  onDelete,
+  deleting,
+}: {
+  videoUrl: string;
+  type: "shorts" | "wide";
+  onDelete: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <div className={cn(
+      "relative group rounded-2xl overflow-hidden border bg-muted/30 transition-all duration-300",
+      type === "shorts" ? "aspect-9/16 max-w-[280px] mx-auto" : "aspect-video w-full"
+    )}>
+      <video
+        src={videoUrl}
+        className="h-full w-full object-cover"
+        controls
+        controlsList="nodownload"
+      />
+      
+      <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 pointer-events-none">
+        <div className="bg-primary/95 backdrop-blur-md text-[10px] font-bold text-primary-foreground px-2 py-0.5 rounded-full shadow-lg border border-white/10 uppercase tracking-wider w-fit">
+          {type === "shorts" ? "Short (Mobile)" : "Apresentação (Web)"}
+        </div>
+      </div>
+
+      <div className="absolute top-2 right-2 z-30 transition-opacity lg:opacity-0 lg:group-hover:opacity-100 opacity-100">
+        <Button
+          type="button"
+          variant="destructive"
+          size="icon"
+          className="h-8 w-8 rounded-lg shadow-lg"
+          onClick={onDelete}
+          disabled={deleting}
+        >
+          {deleting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" | "wide" }) {
+  const [videoFile, setVideoFile] = useState<{ url: string; path: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const supabase = createClient();
+  const folderPath = `${vehicleId}/videos/${type}`;
+
+  const fetchVideo = async () => {
+    if (!vehicleId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.storage.from("vehicles").list(folderPath);
+      if (error) throw error;
+      
+      const file = data?.find(f => !f.name.startsWith('.emptyFolderPlaceholder'));
+      if (file) {
+        const path = `${folderPath}/${file.name}`;
+        const { data: { publicUrl } } = supabase.storage.from("vehicles").getPublicUrl(path);
+        setVideoFile({ url: publicUrl, path });
+      } else {
+        setVideoFile(null);
+      }
+    } catch (err) {
+      console.error(`Error fetching ${type} video:`, err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVideo();
+  }, [vehicleId, type]);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("video/")) {
+      toast.error("Por favor, selecione um arquivo de vídeo válido.");
+      return;
+    }
+
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("O vídeo deve ter no máximo 100MB.");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      
+      // Remove previously existing video to keep max 1 constraint
+      if (videoFile?.path) {
+        await supabase.storage.from("vehicles").remove([videoFile.path]);
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${folderPath}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('vehicles')
+        .upload(filePath, file, {
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('vehicles')
+        .getPublicUrl(filePath);
+
+      setVideoFile({ url: publicUrl, path: filePath });
+      toast.success(`Vídeo ${type === 'shorts' ? 'Short' : 'de Apresentação'} enviado com sucesso!`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error("Erro ao subir o vídeo.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!videoFile?.path) return;
+    
+    try {
+      setDeleting(true);
+      const { error } = await supabase.storage.from("vehicles").remove([videoFile.path]);
+      if (error) throw error;
+      
+      setVideoFile(null);
+      toast.success("Vídeo removido com sucesso!");
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error("Erro ao deletar o vídeo.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className={cn(
+        "flex bg-muted/20 items-center justify-center border rounded-2xl h-40",
+         type === "shorts" ? "max-w-[280px] mx-auto aspect-9/16 h-auto" : "w-full aspect-video h-auto"
+      )}>
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 border rounded-2xl p-6 bg-card/50 shadow-sm hover:shadow-md transition-all border-primary/5">
+      <div className="flex items-center gap-3 border-b border-primary/10 pb-4">
+        <div className="p-2 rounded-xl bg-primary/10 text-primary">
+          {type === 'shorts' ? <Smartphone className="h-5 w-5" /> : <MonitorPlay className="h-5 w-5" />}
+        </div>
+        <div>
+          <h4 className="text-md font-bold tracking-tight">
+            {type === 'shorts' ? 'Vídeo Short (Vertical)' : 'Vídeo de Apresentação (Horizontal)'}
+          </h4>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {type === 'shorts' ? 'Vídeo curto para visualização em formato mobile.' : 'Vídeo completo para a galeria do veículo.'}
+          </p>
+        </div>
+      </div>
+
+      {videoFile ? (
+        <VideoCard
+          videoUrl={videoFile.url}
+          type={type}
+          onDelete={handleDelete}
+          deleting={deleting}
+        />
+      ) : (
+        <div 
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          className={cn(
+            "flex flex-col items-center justify-center border-2 border-dashed border-primary/20 rounded-2xl bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer",
+            uploading && "opacity-50 pointer-events-none",
+            type === "shorts" ? "aspect-9/16 max-w-[280px] mx-auto w-full" : "aspect-video w-full h-[280px]"
+          )}
+        >
+          {uploading ? (
+            <div className="flex flex-col items-center gap-3 text-primary">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="text-sm font-semibold">Enviando vídeo...</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 text-muted-foreground p-6 text-center">
+              <div className="p-4 rounded-full bg-primary/10 text-primary shadow-sm">
+                <Upload className="h-6 w-6" />
+              </div>
+              <div>
+                <span className="text-sm font-bold block mb-1 text-foreground">Clique para selecionar o vídeo</span>
+                <span className="text-xs">MP4, WebM (Máx 100MB)</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        className="hidden"
+        accept="video/mp4,video/webm,video/quicktime"
+      />
+    </div>
+  );
+}
+
 function MediaTab({
   vehicleId,
   form,
@@ -2347,8 +2577,10 @@ function MediaTab({
         </div>
       )}
 
-      <div className="flex items-center justify-between border-b border-primary/10 pb-2">
-        <div className="flex items-center gap-3">
+      {/* Seção de Fotos */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between border-b border-primary/10 pb-2">
+          <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-primary/10 text-primary shadow-sm">
             <Camera className="h-4 w-4" />
           </div>
@@ -2527,6 +2759,27 @@ function MediaTab({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      </div>
+      </div>
+
+      {/* Seção de Vídeos */}
+      <div className="space-y-6 mt-4">
+        <div className="flex items-center gap-3 border-b border-primary/10 pb-2">
+          <div className="p-2.5 rounded-xl bg-primary/10 text-primary shadow-sm">
+            <Video className="h-4 w-4" />
+          </div>
+          <div>
+            <h3 className="text-md font-bold tracking-tight">Galeria de Vídeos</h3>
+            <p className="text-xs text-muted-foreground">
+              Vídeos curtos e de apresentação do veículo
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <VideoUploader vehicleId={vehicleId || ""} type="shorts" />
+          <VideoUploader vehicleId={vehicleId || ""} type="wide" />
+        </div>
       </div>
     </div>
   );
