@@ -1,16 +1,26 @@
-"use client"
+"use client";
 
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarRail,
-} from "@/components/ui/sidebar"
-import { LayoutDashboard, Car, Users, Settings2, PanelsTopLeft } from "lucide-react"
-import { usePathname } from "next/navigation"
-import { NavMain } from "./components/nav-main"
-import { NavSettings } from "./components/nav-settings"
-import { NavUser } from "./components/nav-user"
+} from "@/components/ui/sidebar";
+import {
+  LayoutDashboard,
+  Car,
+  Users,
+  Settings2,
+  PanelsTopLeft,
+  PanelTopBottomDashed,
+  PanelTop,
+  Globe,
+} from "lucide-react";
+import { usePathname } from "next/navigation";
+import { NavMain } from "./components/nav-main";
+import { NavSettings } from "./components/nav-settings";
+import { NavUser } from "./components/nav-user";
+import { NavMarketing } from "./components/nav-marketing";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -29,73 +39,116 @@ const data = {
       title: "Dashboard",
       url: "/dashboard",
       icon: LayoutDashboard,
-      slug: "dashboard:view"
+      slug: "dashboard:view",
     },
     {
       title: "Clientes",
       url: "/clientes",
+      slug: "customers:view",
       icon: Users,
     },
     {
       title: "Veículos",
       url: "/veiculos",
       icon: Car,
-      slug: "vehicles:read"
+      slug: "vehicles:view",
     },
+  ],
 
+  navWebsite: [
+    {
+      title: "Website",
+      url: "#",
+      icon: Globe,
+      slug: "website:view",
+      items: [
+        {
+          title: "Banners",
+          url: "#",
+          icon: PanelsTopLeft,
+          slug: "banners:view",
+        },
+      ],
+    },
   ],
   navSettings: [
     {
       title: "Configurações",
       url: "#",
       icon: Settings2,
-      slug: "settings:manage",
+      slug: "settings:view",
       items: [
-        {
-          title: "Site",
-          url: "#",
-          icon: PanelsTopLeft,
-        },
         {
           title: "Usuários",
           url: "/configuracoes/usuarios",
           icon: Users,
-          slug: "users:manage"
+          slug: "settings:users:view",
         },
         {
           title: "Perfis e Permissões",
           url: "/configuracoes/perfis",
           icon: Settings2,
-          slug: "settings:manage"
-        }
-      ]
-    }
-  ]
-}
+          slug: "settings:profiles:view",
+        },
+      ],
+    },
+  ],
+};
 
-export function AppSidebar({ user, permissions = [], setOpen, hoverHabilitado, ...props }: AppSidebarProps) {
-
+export function AppSidebar({
+  user,
+  permissions = [],
+  setOpen,
+  hoverHabilitado,
+  ...props
+}: AppSidebarProps) {
   const effectiveUser = user || null;
 
   // Filter menu items based on permissions
-  const filteredNavOptions = data.navOptions.filter(item => 
-    !item.slug || permissions.includes(item.slug)
-  )
+  const filteredNavOptions = data.navOptions.filter(
+    (item) => !item.slug || permissions.includes(item.slug),
+  );
 
-  const filteredNavSettings = data.navSettings.map(setting => ({
-    ...setting,
-    items: setting.items?.filter(item => !item.slug || permissions.includes(item.slug))
-  })).filter(setting => 
-    (!setting.slug || permissions.includes(setting.slug)) || (setting.items && setting.items.length > 0)
-  )
+  const filteredNavWebsite = data.navWebsite
+    .map((setting) => ({
+      ...setting,
+      items: setting.items?.filter(
+        (item) => !item.slug || permissions.includes(item.slug),
+      ),
+    }))
+    .filter(
+      (setting) =>
+        !setting.slug ||
+        permissions.includes(setting.slug) ||
+        (setting.items && setting.items.length > 0),
+    );
+
+  const filteredNavSettings = data.navSettings
+    .map((setting) => ({
+      ...setting,
+      items: setting.items?.filter(
+        (item) => !item.slug || permissions.includes(item.slug),
+      ),
+    }))
+    .filter(
+      (setting) =>
+        !setting.slug ||
+        permissions.includes(setting.slug) ||
+        (setting.items && setting.items.length > 0),
+    );
 
   return (
-    <Sidebar onMouseOver={() => {
-      if (!hoverHabilitado) return;
-      setOpen?.(true)
-    }} collapsible="icon" {...props}>
+    <Sidebar
+      onMouseOver={() => {
+        if (!hoverHabilitado) return;
+        setOpen?.(true);
+      }}
+      collapsible="icon"
+      {...props}
+    >
       <SidebarContent>
         <NavMain items={filteredNavOptions} />
+        <NavMarketing items={filteredNavWebsite} />
         <NavSettings items={filteredNavSettings} />
       </SidebarContent>
       <SidebarFooter>

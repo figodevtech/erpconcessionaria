@@ -119,6 +119,7 @@ import {
 } from "@dnd-kit/modifiers";
 import { AIDescriptionBox } from "./ai-description-box";
 import { formatCurrency, parseCurrency } from "@/lib/utils";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export interface VehicleFormValues {
   type: string;
@@ -168,6 +169,8 @@ export function VehicleDialog({
   vehicle,
   onSuccess,
 }: VehicleDialogProps) {
+  const { hasPermission } = usePermissions();
+  const canUpdate = hasPermission("vehicles:update");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
@@ -618,7 +621,7 @@ export function VehicleDialog({
                 <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
                   <GeneralTab
                     form={form}
-                    loading={loading}
+                    loading={loading || !canUpdate}
                     fipeBrands={fipeBrands}
                     fipeModels={fipeModels}
                     fipeBaseModels={fipeBaseModels}
@@ -635,7 +638,7 @@ export function VehicleDialog({
                 <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
                   <MarketplaceTab
                     form={form}
-                    loading={loading}
+                    loading={loading || !canUpdate}
                     onGenerateAI={handleGenerateAIDescription}
                     generatingAI={generatingAI}
                     aiStats={aiStats}
@@ -659,7 +662,7 @@ export function VehicleDialog({
                           prev.filter((img) => img.id !== id),
                         )
                       }
-                      loading={loading}
+                      loading={loading || !canUpdate}
                     />
                   </ScrollArea>
                 </TabsContent>
@@ -677,18 +680,20 @@ export function VehicleDialog({
                 >
                   Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="hover:cursor-pointer px-8 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
-                >
-                  {loading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                  )}
-                  Salvar Veículo
-                </Button>
+                {canUpdate && (
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="hover:cursor-pointer px-8 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+                  >
+                    {loading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+                    Salvar Veículo
+                  </Button>
+                )}
               </div>
             </DialogFooter>
           </form>

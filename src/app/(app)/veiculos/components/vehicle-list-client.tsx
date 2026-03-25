@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { motion, AnimatePresence } from "framer-motion"
 import { VehicleDialog } from "./vehicle-dialog"
+import { usePermissions } from "@/hooks/use-permissions"
 
 export type SellerType = "dealership" | "store" | "private";
 export type VehicleStatus = "Em venda" | "Vendido" | "Rascunho" | "Pagamento";
@@ -75,6 +76,7 @@ export type VehicleListClientProps = {
 }
 
 export function VehicleListClient({ search, status, page, setPage }: VehicleListClientProps) {
+  const { hasPermission } = usePermissions()
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -167,15 +169,17 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
               </button>
             </div>
 
-            <Button
-              onClick={handleCreateNew}
-              variant={"outline"}
-              size={"sm"}
-              className="cursor-pointer text-xs"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Veículo
-            </Button>
+            {hasPermission("vehicles:create") && (
+              <Button
+                onClick={handleCreateNew}
+                variant={"outline"}
+                size={"sm"}
+                className="cursor-pointer text-xs"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Veículo
+              </Button>
+            )}
           </div>
         </div>
         <VehicleDialog

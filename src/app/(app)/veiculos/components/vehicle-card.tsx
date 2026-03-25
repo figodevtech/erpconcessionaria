@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Vehicle } from "./vehicle-list-client";
 import { formatMileage, formatPrice } from "@/lib/vehicles";
 import { useState } from "react";
+import { usePermissions } from "@/hooks/use-permissions";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -59,7 +60,13 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export function VehicleCard({ vehicle, priority, onEdit, onDeleteSuccess }: VehicleCardProps) {
+export function VehicleCard({
+  vehicle,
+  priority,
+  onEdit,
+  onDeleteSuccess,
+}: VehicleCardProps) {
+  const { hasPermission } = usePermissions();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -198,16 +205,18 @@ export function VehicleCard({ vehicle, priority, onEdit, onDeleteSuccess }: Vehi
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteDialog(true);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir
-                </DropdownMenuItem>
+                {hasPermission("vehicles:delete") && (
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeleteDialog(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -219,7 +228,11 @@ export function VehicleCard({ vehicle, priority, onEdit, onDeleteSuccess }: Vehi
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza absoluta?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação excluirá o veículo <strong>{vehicle.brand} {vehicle.model}</strong> permanentemente do marketplace.
+              Esta ação excluirá o veículo{" "}
+              <strong>
+                {vehicle.brand} {vehicle.model}
+              </strong>{" "}
+              permanentemente do marketplace.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">

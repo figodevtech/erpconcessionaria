@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ArrowLeftRight, Edit, MoreHorizontal, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export function VehicleTable({
   vehicles,
@@ -45,6 +46,7 @@ export function VehicleTable({
   onEdit: (vehicle: Vehicle) => void;
   onDeleteSuccess: () => void;
 }) {
+  const { hasPermission } = usePermissions();
   const [isDeleting, setIsDeleting] = useState(false);
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const getStatusColor = (status: string) => {
@@ -181,13 +183,15 @@ export function VehicleTable({
                         Transferir
                       </DropdownMenuItem> */}
 
-                      <DropdownMenuItem
-                        className="hover:cursor-pointer text-destructive focus:text-destructive"
-                        onClick={() => setVehicleToDelete(vehicle)}
-                      >
-                        <Trash2Icon className="mr-2 h-4 w-4" />
-                        Excluir
-                      </DropdownMenuItem>
+                      {hasPermission("vehicles:delete") && (
+                        <DropdownMenuItem
+                          className="hover:cursor-pointer text-destructive focus:text-destructive"
+                          onClick={() => setVehicleToDelete(vehicle)}
+                        >
+                          <Trash2Icon className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

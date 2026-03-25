@@ -41,24 +41,39 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // RBAC Check using public.users and public.profiles
+  // RBAC Check
   if (user) {
     const { data: profile } = await supabase
       .from('users')
-      .select('*, profile:profiles(name, role_permissions(permission:permissions(slug)))')
+      .select('profile:profiles(name)')
       .eq('id', user.id)
       .single()
 
-    const permissions = (profile as any)?.profile?.role_permissions?.map((p: any) => p.permission.slug) || []
+    const roleName = (profile as any)?.profile?.name
     const pathname = request.nextUrl.pathname
 
+    // Skip redirect for Administrador
+    if (roleName === "Administrador") {
+      return supabaseResponse
+    }
+
+    const { data: rolePermissions } = await supabase
+      .from('role_permissions')
+      .select('permission_slug')
+      .eq('role_name', roleName || '')
+
+    const permissions = rolePermissions?.map((p: any) => p.permission_slug) || []
+    
+    // We already have granular checks on the pages. 
+    // Middleware should only handle basic top-level redirects if needed.
     const routePermissions: { [key: string]: string } = {
-      '/configuracoes': 'settings:manage',
+      // You can keep some top-level ones if they exist in DB
+      '/configuracoes': 'settings:view',
       '/financeiro': 'finance:view'
     }
 
     for (const [route, slug] of Object.entries(routePermissions)) {
-      if (pathname.startsWith(route) && !permissions.includes(slug)) {
+      if (pathname.startsWith(route) && !permissions.includes(slug) && !permissions.includes("admin")) {
         const url = request.nextUrl.clone()
         url.pathname = '/dashboard'
         return NextResponse.redirect(url)

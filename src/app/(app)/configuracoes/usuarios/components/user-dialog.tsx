@@ -31,6 +31,7 @@ import { Loader2, User, Mail, Shield, CheckCircle2 } from "lucide-react"
 import { createUserAction } from "@/actions/users"
 import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface UserDialogProps {
   open: boolean
@@ -47,6 +48,8 @@ export function UserDialog({
   profiles,
   onSuccess,
 }: UserDialogProps) {
+  const { hasPermission } = usePermissions()
+  const canUpdate = hasPermission("settings:users:update")
   const [isPending, startTransition] = useTransition()
   const isEditing = !!user
 
@@ -135,7 +138,7 @@ export function UserDialog({
                       <FormControl>
                         <div className="relative">
                           <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input placeholder="João Silva" className="pl-9" {...field} required />
+                          <Input placeholder="João Silva" className="pl-9" {...field} required disabled={isPending || !canUpdate} />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -158,7 +161,7 @@ export function UserDialog({
                             className="pl-9" 
                             {...field} 
                             required 
-                            disabled={isEditing}
+                            disabled={isEditing || isPending || !canUpdate}
                           />
                         </div>
                       </FormControl>
@@ -175,7 +178,7 @@ export function UserDialog({
                       <FormItem>
                         <FormLabel>Senha Temporária</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} required />
+                          <Input type="password" {...field} required disabled={isPending || !canUpdate} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -189,7 +192,7 @@ export function UserDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Perfil de Acesso</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isPending || !canUpdate}>
                         <FormControl>
                           <SelectTrigger className="pl-9 relative">
                             <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -222,18 +225,20 @@ export function UserDialog({
                 >
                   Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={isPending}
-                  className="px-8 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
-                >
-                  {isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                  )}
-                  Salvar Usuário
-                </Button>
+                {canUpdate && (
+                  <Button
+                    type="submit"
+                    disabled={isPending}
+                    className="px-8 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+                  >
+                    {isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+                    Salvar Usuário
+                  </Button>
+                )}
               </div>
             </DialogFooter>
           </form>

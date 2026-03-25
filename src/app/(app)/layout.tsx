@@ -4,10 +4,10 @@ import { AppSidebar } from "@/components/sidebar/app-sidebar"
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
 import { DashboardHeader } from "@/components/dashboard-header"
+import { getMyPermissions } from "@/utils/permissions"
+import { PermissionsProvider } from "@/components/permissions-provider"
 
 export default async function DashboardLayout({
   children,
@@ -24,26 +24,28 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabase
     .from('users')
-    .select('*, profile:profiles(name, role_permissions(permission:permissions(slug)))')
+    .select('name')
     .eq('id', user.id)
     .single()
 
-  const permissions = (profile as any)?.profile?.role_permissions?.map((p: any) => p.permission.slug) || []
+  const permissions = await getMyPermissions()
 
-  const mappedUser = user ? {
+  const mappedUser = {
     nome: profile?.name || user.user_metadata?.name || user.email?.split('@')[0] || "Usuário",
     email: user.email || "",
-  } : { nome: "Convidado", email: "" }
+  }
 
   return (
-    <SidebarProvider>
-      <AppSidebar user={mappedUser} permissions={permissions} />
-      <SidebarInset>
-        <DashboardHeader />
-        <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
-          {children}
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <PermissionsProvider permissions={permissions}>
+      <SidebarProvider>
+        <AppSidebar user={mappedUser} permissions={permissions} />
+        <SidebarInset>
+          <DashboardHeader />
+          <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+            {children}
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </PermissionsProvider>
   )
 }

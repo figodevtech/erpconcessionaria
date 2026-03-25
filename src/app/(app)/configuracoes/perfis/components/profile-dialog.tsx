@@ -72,11 +72,11 @@ export function ProfileDialog({
     return acc
   }, {} as Record<string, any[]>)
 
-  const handleTogglePerm = (permId: string, checked: boolean) => {
+  const handleTogglePerm = (slug: string, checked: boolean) => {
     if (checked) {
-      setSelectedPerms([...selectedPerms, permId])
+      setSelectedPerms([...selectedPerms, slug])
     } else {
-      setSelectedPerms(selectedPerms.filter(id => id !== permId))
+      setSelectedPerms(selectedPerms.filter(s => s !== slug))
     }
   }
 
@@ -183,13 +183,13 @@ export function ProfileDialog({
                           <div className="p-4 space-y-4">
                             {perms.map((perm: any) => (
                               <div key={perm.id} className="flex items-center justify-between group">
-                                <Label htmlFor={`new-${perm.id}`} className="text-xs font-medium cursor-pointer">
+                                <Label htmlFor={`new-${perm.slug}`} className="text-xs font-medium cursor-pointer">
                                   {capitalize(perm.action)}
                                 </Label>
                                 <Switch 
-                                  id={`new-${perm.id}`}
-                                  checked={selectedPerms.includes(perm.id)}
-                                  onCheckedChange={(checked) => handleTogglePerm(perm.id, checked)}
+                                  id={`new-${perm.slug}`}
+                                  checked={selectedPerms.includes(perm.slug)}
+                                  onCheckedChange={(checked) => handleTogglePerm(perm.slug, checked)}
                                   className="scale-75"
                                 />
                               </div>

@@ -16,18 +16,18 @@ export async function getRolesAction(params?: {
 
   let query = supabase
     .from("profiles")
-    .select("*, role_permissions(permission_id)", { count: "exact" })
+    .select("*, role_permissions(permission_slug)", { count: "exact" })
 
   if (search) {
-    query = query.ilike('name', `%${search}%`)
+    query = query.ilike("name", `%${search}%`)
   }
 
   const { data, error, count } = await query
     .range((page - 1) * pageSize, page * pageSize - 1)
-    .order('id', { ascending: true })
+    .order("name")
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data, count: count || 0 }
+  return { success: true, data, count }
 }
 
 export async function getPermissionsAction() {
@@ -41,22 +41,22 @@ export async function getPermissionsAction() {
   return { success: true, data }
 }
 
-export async function updateRolePermissionsAction(roleId: number, permissionIds: string[]) {
+export async function updateRolePermissionsAction(roleName: string, permissionSlugs: string[]) {
   const supabase = await createClient()
 
   // 1. Delete existing permissions
   const { error: deleteError } = await supabase
     .from("role_permissions")
     .delete()
-    .eq("role_id", roleId)
+    .eq("role_name", roleName)
 
   if (deleteError) return { success: false, error: deleteError.message }
 
   // 2. Insert new permissions
-  if (permissionIds.length > 0) {
+  if (permissionSlugs.length > 0) {
     const { error: insertError } = await supabase
       .from("role_permissions")
-      .insert(permissionIds.map(id => ({ role_id: roleId, permission_id: id })))
+      .insert(permissionSlugs.map(slug => ({ role_name: roleName, permission_slug: slug })))
 
     if (insertError) return { success: false, error: insertError.message }
   }
@@ -65,7 +65,7 @@ export async function updateRolePermissionsAction(roleId: number, permissionIds:
   return { success: true }
 }
 
-export async function createRoleAction(name: string, description: string, permissionIds: string[]) {
+export async function createRoleAction(name: string, description: string, permissionSlugs: string[]) {
   const supabase = await createClient()
 
   // 1. Create Profile
@@ -78,10 +78,10 @@ export async function createRoleAction(name: string, description: string, permis
   if (roleError) return { success: false, error: roleError.message }
 
   // 2. Assign initial permissions if any
-  if (permissionIds.length > 0) {
+  if (permissionSlugs.length > 0) {
     const { error: permError } = await supabase
       .from("role_permissions")
-      .insert(permissionIds.map(id => ({ role_id: role.id, permission_id: id })))
+      .insert(permissionSlugs.map(slug => ({ role_name: name, permission_slug: slug })))
 
     if (permError) return { success: false, error: "Role created, but permissions failed: " + permError.message }
   }

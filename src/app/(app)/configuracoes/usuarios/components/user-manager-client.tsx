@@ -33,8 +33,10 @@ import { toast } from "sonner"
 import { UserFilters } from "./user-filters"
 import { UserDialog } from "./user-dialog"
 import { VehiclePagination } from "@/app/(app)/veiculos/components/vehicle-pagination"
+import { usePermissions } from "@/hooks/use-permissions"
 
 export function UserManagerClient({ initialProfiles }: { initialProfiles: any[] }) {
+  const { hasPermission } = usePermissions()
   const [users, setUsers] = useState<any[]>([])
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -95,10 +97,12 @@ export function UserManagerClient({ initialProfiles }: { initialProfiles: any[] 
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Lista de Usuários</h2>
-        <Button onClick={handleNew} size="sm" className="rounded-xl shadow-lg">
-          <UserPlus className="mr-2 h-4 w-4" />
-          Novo Usuário
-        </Button>
+        {hasPermission("settings:users:create") && (
+          <Button onClick={handleNew} size="sm" className="rounded-xl shadow-lg">
+            <UserPlus className="mr-2 h-4 w-4" />
+            Novo Usuário
+          </Button>
+        )}
       </div>
 
       <UserFilters search={search} setSearch={setSearch} setPage={setPage} />
@@ -154,16 +158,18 @@ export function UserManagerClient({ initialProfiles }: { initialProfiles: any[] 
                           <Edit className="mr-2 h-4 w-4" />
                           Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => {
-                            setUserToDelete(user)
-                            setDeleteAlertOpen(true)
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
+                        {hasPermission("settings:users:delete") && (
+                          <DropdownMenuItem 
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => {
+                              setUserToDelete(user)
+                              setDeleteAlertOpen(true)
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

@@ -7,10 +7,9 @@ import { updateRolePermissionsAction } from "@/actions/roles"
 import { toast } from "sonner"
 
 interface Permission {
-  id: string
+  slug: string
   module: string
   action: string
-  slug: string
 }
 
 import { LayoutDashboard, DollarSign, Settings, Users, Car, Shield, Lock } from "lucide-react"
@@ -28,16 +27,16 @@ const MODULE_ICONS: Record<string, any> = {
 }
 
 export function ProfilePermissionsMatrix({
-  perfilId,
+  perfilName,
   allPermissions,
-  initialPermissionIds
+  initialPermissionSlugs
 }: {
-  perfilId: number,
+  perfilName: string,
   allPermissions: Permission[],
-  initialPermissionIds: string[]
+  initialPermissionSlugs: string[]
 }) {
   const [isPending, startTransition] = useTransition()
-  const [selectedIds, setSelectedIds] = useState<string[]>(initialPermissionIds)
+  const [selectedSlugs, setSelectedSlugs] = useState<string[]>(initialPermissionSlugs)
 
   // Group permissions by module
   const grouped = allPermissions.reduce((acc, curr) => {
@@ -47,20 +46,20 @@ export function ProfilePermissionsMatrix({
     return acc
   }, {} as Record<string, Permission[]>)
 
-  const handleToggle = (permId: string, checked: boolean) => {
-    const newSelectedIds = checked
-      ? [...selectedIds, permId]
-      : selectedIds.filter(id => id !== permId)
+  const handleToggle = (permSlug: string, checked: boolean) => {
+    const newSelectedSlugs = checked
+      ? [...selectedSlugs, permSlug]
+      : selectedSlugs.filter(slug => slug !== permSlug)
 
-    const previousIds = [...selectedIds]
-    setSelectedIds(newSelectedIds)
+    const previousSlugs = [...selectedSlugs]
+    setSelectedSlugs(newSelectedSlugs)
 
     startTransition(async () => {
-      const result = await updateRolePermissionsAction(perfilId, newSelectedIds)
+      const result = await updateRolePermissionsAction(perfilName, newSelectedSlugs)
       if (result.success) {
         toast.success("Permissões atualizadas")
       } else {
-        setSelectedIds(previousIds)
+        setSelectedSlugs(previousSlugs)
         toast.error("Erro ao atualizar: " + result.error)
       }
     })
@@ -87,19 +86,19 @@ export function ProfilePermissionsMatrix({
             </div>
             <div className="p-4 space-y-4 flex-1">
               {perms.map((perm) => (
-                <div key={perm.id} className="flex items-center justify-between group">
+                <div key={perm.slug} className="flex items-center justify-between group">
                   <Label
-                    htmlFor={`${perfilId}-${perm.id}`}
+                    htmlFor={`${perfilName}-${perm.slug}`}
                     className="text-xs font-medium text-muted-foreground group-hover:text-foreground cursor-pointer transition-colors"
                   >
                     {capitalize(perm.action)}
                   </Label>
                   <Switch
-                    id={`${perfilId}-${perm.id}`}
+                    id={`${perfilName}-${perm.slug}`}
                     disabled={isPending}
                     className="scale-90"
-                    checked={selectedIds.includes(perm.id)}
-                    onCheckedChange={(checked) => handleToggle(perm.id, checked)}
+                    checked={selectedSlugs.includes(perm.slug)}
+                    onCheckedChange={(checked) => handleToggle(perm.slug, checked)}
                   />
                 </div>
               ))}

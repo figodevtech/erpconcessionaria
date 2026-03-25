@@ -3,8 +3,13 @@ import { VehicleKpiCards } from "./components/vehicle-kpi-cards"
 import { VehicleStatusChart } from "./components/vehicle-status-chart"
 import { VehicleBrandChart } from "./components/vehicle-brand-chart"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { checkPermission } from "@/utils/permissions"
+import { AccessDenied } from "@/components/access-denied"
 
 export default async function Dashboard() {
+  const hasViewPermission = await checkPermission("dashboard:view")
+  if (!hasViewPermission) return <AccessDenied />
+
   const supabase = await createClient()
 
   // Buscar todos os veículos ativos (não deletados)
