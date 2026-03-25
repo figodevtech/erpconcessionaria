@@ -1,0 +1,244 @@
+"use client"
+
+import { useState, useEffect, useTransition } from "react"
+import { useForm } from "react-hook-form"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Loader2, User, Mail, Shield, CheckCircle2 } from "lucide-react"
+import { createUserAction } from "@/actions/users"
+import { toast } from "sonner"
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+interface UserDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  user?: any | null
+  profiles: any[]
+  onSuccess: () => void
+}
+
+export function UserDialog({
+  open,
+  onOpenChange,
+  user,
+  profiles,
+  onSuccess,
+}: UserDialogProps) {
+  const [isPending, startTransition] = useTransition()
+  const isEditing = !!user
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      profile_id: "",
+    },
+  })
+
+  useEffect(() => {
+    if (open) {
+      if (user) {
+        form.reset({
+          name: user.name || "",
+          email: user.email || "",
+          password: "", // Don't show password
+          profile_id: user.profile_id?.toString() || "",
+        })
+      } else {
+        form.reset({
+          name: "",
+          email: "",
+          password: "",
+          profile_id: "",
+        })
+      }
+    }
+  }, [open, user, form])
+
+  async function onSubmit(data: any) {
+    const formData = new FormData()
+    Object.entries(data).forEach(([key, value]) => {
+      formData.append(key, value as string)
+    })
+    
+    if (isEditing) {
+      formData.append("id", user.id)
+    }
+
+    startTransition(async () => {
+      const result = await createUserAction(formData) // This handles both create and theoretically update if expanded
+      if (result.success) {
+        toast.success(isEditing ? "Usuário atualizado" : "Usuário criado")
+        onSuccess()
+        onOpenChange(false)
+      } else {
+        toast.error("Erro: " + result.error)
+      }
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex flex-col max-w-[600px] max-h-[90vh] p-0 overflow-hidden border-none shadow-2xl">
+        <DialogHeader className="shrink-0 px-8 py-6 border-b bg-card/50 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <User className="h-6 w-6" />
+            </div>
+            <div>
+              <DialogTitle className="text-2xl font-bold tracking-tight">
+                {isEditing ? `Editar Usuário` : "Novo Usuário"}
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground mt-1">
+                {isEditing
+                  ? "Gerencie as informações e o nível de acesso deste colaborador."
+                  : "Cadastre um novo colaborador preenchendo as informações abaixo."}
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
+            <ScrollArea className="flex-1 overflow-y-auto">
+              <div className="p-8 space-y-6">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Completo</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input placeholder="João Silva" className="pl-9" {...field} required />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>E-mail Corporativo</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            type="email" 
+                            placeholder="joao@empresa.com" 
+                            className="pl-9" 
+                            {...field} 
+                            required 
+                            disabled={isEditing}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {!isEditing && (
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Senha Temporária</FormLabel>
+                        <FormControl>
+                          <Input type="password" {...field} required />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="profile_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Perfil de Acesso</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="pl-9 relative">
+                            <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <SelectValue placeholder="Selecione um cargo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {profiles.map((profile) => (
+                            <SelectItem key={profile.id} value={profile.id.toString()}>
+                              {profile.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </ScrollArea>
+
+            <DialogFooter className="shrink-0 px-8 py-4 border-t bg-card/50 backdrop-blur-md">
+              <div className="flex w-full justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isPending}
+                  className="px-6 rounded-xl hover:bg-muted"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  className="px-8 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+                >
+                  {isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  Salvar Usuário
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
+}

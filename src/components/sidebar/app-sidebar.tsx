@@ -17,6 +17,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
     nome: string;
     email: string;
   } | null;
+  permissions?: string[];
   setOpen?: (open: boolean) => void;
   hoverHabilitado?: boolean;
 }
@@ -28,6 +29,7 @@ const data = {
       title: "Dashboard",
       url: "/dashboard",
       icon: LayoutDashboard,
+      slug: "dashboard:view"
     },
     {
       title: "Clientes",
@@ -38,6 +40,7 @@ const data = {
       title: "Veículos",
       url: "/veiculos",
       icon: Car,
+      slug: "vehicles:read"
     },
 
   ],
@@ -46,20 +49,45 @@ const data = {
       title: "Configurações",
       url: "#",
       icon: Settings2,
+      slug: "settings:manage",
       items: [
         {
           title: "Site",
           url: "#",
           icon: PanelsTopLeft,
         },
+        {
+          title: "Usuários",
+          url: "/configuracoes/usuarios",
+          icon: Users,
+          slug: "users:manage"
+        },
+        {
+          title: "Perfis e Permissões",
+          url: "/configuracoes/perfis",
+          icon: Settings2,
+          slug: "settings:manage"
+        }
       ]
     }
   ]
 }
 
-export function AppSidebar({ user, setOpen, hoverHabilitado, ...props }: AppSidebarProps) {
+export function AppSidebar({ user, permissions = [], setOpen, hoverHabilitado, ...props }: AppSidebarProps) {
 
   const effectiveUser = user || null;
+
+  // Filter menu items based on permissions
+  const filteredNavOptions = data.navOptions.filter(item => 
+    !item.slug || permissions.includes(item.slug)
+  )
+
+  const filteredNavSettings = data.navSettings.map(setting => ({
+    ...setting,
+    items: setting.items?.filter(item => !item.slug || permissions.includes(item.slug))
+  })).filter(setting => 
+    (!setting.slug || permissions.includes(setting.slug)) || (setting.items && setting.items.length > 0)
+  )
 
   return (
     <Sidebar onMouseOver={() => {
@@ -67,8 +95,8 @@ export function AppSidebar({ user, setOpen, hoverHabilitado, ...props }: AppSide
       setOpen?.(true)
     }} collapsible="icon" {...props}>
       <SidebarContent>
-        <NavMain items={data.navOptions} />
-        <NavSettings items={data.navSettings} />
+        <NavMain items={filteredNavOptions} />
+        <NavSettings items={filteredNavSettings} />
       </SidebarContent>
       <SidebarFooter>
         {effectiveUser && (

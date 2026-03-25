@@ -27,10 +27,6 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -40,24 +36,35 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/auth')
   ) {
-    // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
-  // creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
+  // RBAC Check using public.users and public.profiles
+  if (user) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('*, profile:profiles(name, role_permissions(permission:permissions(slug)))')
+      .eq('id', user.id)
+      .single()
+
+    const permissions = (profile as any)?.profile?.role_permissions?.map((p: any) => p.permission.slug) || []
+    const pathname = request.nextUrl.pathname
+
+    const routePermissions: { [key: string]: string } = {
+      '/configuracoes': 'settings:manage',
+      '/financeiro': 'finance:view'
+    }
+
+    for (const [route, slug] of Object.entries(routePermissions)) {
+      if (pathname.startsWith(route) && !permissions.includes(slug)) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+      }
+    }
+  }
 
   return supabaseResponse
 }
