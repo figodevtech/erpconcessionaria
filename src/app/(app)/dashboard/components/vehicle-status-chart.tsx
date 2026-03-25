@@ -18,9 +18,23 @@ const COLORS = [
 ];
 
 const chartConfig = {
-  value: {
-    label: "Veículos",
+  "Em venda": {
+    label: "Em venda",
+    color: "hsl(var(--primary))",
   },
+  "Vendido": {
+    label: "Vendido",
+    color: "hsl(var(--primary))",
+  },
+  "Rascunho": {
+    label: "Rascunho",
+    color: "hsl(var(--primary))",
+  },
+  "Pagamento": {
+    label: "Pagamento",
+    color: "hsl(var(--primary))",
+  },
+
 } satisfies ChartConfig
 
 export function VehicleStatusChart({ data }: { data: StatusData[] }) {
@@ -72,7 +86,7 @@ export function VehicleStatusChart({ data }: { data: StatusData[] }) {
             />
             <ChartLegend
               className="text-foreground flex-wrap gap-2 text-xs *:basis-1/2 *:justify-center sm:*:basis-1/4 mt-4"
-              content={<ChartLegendContent nameKey="value" />}
+              content={<ChartLegendContent nameKey="" />}
               verticalAlign="bottom"
             />
           </PieChart>
