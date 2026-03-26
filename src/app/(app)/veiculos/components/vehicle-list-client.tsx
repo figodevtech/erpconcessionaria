@@ -79,6 +79,7 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
   const { hasPermission } = usePermissions()
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showImages, setShowImages] = useState(false)
   const [viewMode, setViewMode] = useState<"list" | "grid">("list")
@@ -98,11 +99,12 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
   const fetchVehicles = useCallback(async (newVehicle?: Vehicle) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/vehicles?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&page=${page}&limit=10`)
+      const res = await fetch(`/api/vehicles?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&page=${page}&limit=30`)
       const data = await res.json()
       setVehicles(data.data || [])
       setTotalPages(data.meta?.totalPages || 1)
-      
+      setTotalItems(data.meta?.total || 0)
+
       // If a new vehicle was saved/updated, refresh the selected vehicle state
       if (newVehicle) {
         setSelectedVehicle(newVehicle)
@@ -127,7 +129,7 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
       <CardHeader className="border-b-2 pb-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <CardTitle>Lista de Veículos | <span className="text-muted-foreground font-normal font-mono">{vehicles.length} resultados</span></CardTitle>
+            <CardTitle>Lista de Veículos | <span className="text-muted-foreground font-normal font-mono">{totalItems} resultados</span></CardTitle>
             <CardDescription className="mt-1">
               <button
                 onClick={() => fetchVehicles()}

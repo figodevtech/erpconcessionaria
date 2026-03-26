@@ -8,6 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
@@ -81,13 +82,11 @@ function AlertDialogAction({
 
 function AlertDialogCancel({
   className,
-  onClick,
   ...props
-}: React.ComponentProps<"button">) {
+}: React.ComponentProps<typeof DialogClose>) {
   return (
-    <button
+    <DialogClose
       className={cn(buttonVariants({ variant: "outline" }), className)}
-      onClick={onClick}
       {...props}
     />
   )

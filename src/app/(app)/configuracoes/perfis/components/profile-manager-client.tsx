@@ -1,11 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import {
-  getRolesAction,
-  getPermissionsAction,
-  deleteRoleAction,
-} from "@/actions/roles";
+import { useState } from "react";
+import { deleteRoleAction } from "@/actions/roles";
 import {
   Table,
   TableBody,
@@ -22,7 +18,6 @@ import {
   Loader2,
   ShieldCheck,
   Lock,
-  Plus,
   Trash2,
   AlertTriangle,
   CheckCircle2,
@@ -52,48 +47,54 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { ProfileFilters } from "./profile-filters";
 import { ProfilePermissionsMatrix } from "./profile-permissions-matrix";
 import { VehiclePagination } from "@/app/(app)/veiculos/components/vehicle-pagination";
 import { ProfileDialog } from "./profile-dialog";
 import { usePermissions } from "@/hooks/use-permissions";
 
-export function ProfileManagerClient() {
+interface Permission {
+  id: number;
+  slug: string;
+  module: string;
+  action: string;
+  description?: string;
+}
+
+interface Profile {
+  id: number;
+  name: string;
+  description?: string;
+  role_permissions?: { permission_slug: string }[];
+}
+
+interface ProfileManagerClientProps {
+  profiles: Profile[]
+  loading: boolean
+  onSuccess: () => void
+  page: number
+  setPage: (p: number) => void
+  count: number
+  pageSize: number
+  allPermissions: Permission[]
+}
+
+export function ProfileManagerClient({
+  profiles,
+  loading,
+  onSuccess,
+  page,
+  setPage,
+  count,
+  pageSize,
+  allPermissions
+}: ProfileManagerClientProps) {
   const { hasPermission } = usePermissions();
-  const [profiles, setProfiles] = useState<any[]>([]);
-  const [allPermissions, setAllPermissions] = useState<any[]>([]);
-  const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
 
-  const [editingProfile, setEditingProfile] = useState<any | null>(null);
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [profileToDelete, setProfileToDelete] = useState<any | null>(null);
+  const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    const [rolesResult, permsResult] = await Promise.all([
-      getRolesAction({ page, pageSize, search }),
-      getPermissionsAction(),
-    ]);
-
-    if (rolesResult.success) {
-      setProfiles(rolesResult.data || []);
-      setCount(rolesResult.count || 0);
-    }
-    if (permsResult.success) {
-      setAllPermissions(permsResult.data || []);
-    }
-    setLoading(false);
-  }, [page, search]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
   const handleDelete = async () => {
     if (!profileToDelete) return;
@@ -104,11 +105,11 @@ export function ProfileManagerClient() {
         toast.success("Perfil excluído com sucesso");
         setDeleteAlertOpen(false);
         setProfileToDelete(null);
-        loadData();
+        onSuccess();
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch (e) {
       toast.error("Erro inesperado ao excluir perfil");
     } finally {
       setIsDeleting(false);
@@ -119,124 +120,90 @@ export function ProfileManagerClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-border/50 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
-            <Shield className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold tracking-tight">
-              Gestão de Cargos
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {count} perfis configurados
-            </p>
-          </div>
-        </div>
-        {hasPermission("settings:profiles:create") && (
-          <Button
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="rounded-xl px-6 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all active:scale-95"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Perfil
-          </Button>
-        )}
-      </div>
-
-      <ProfileFilters search={search} setSearch={setSearch} setPage={setPage} />
-
-      <div className="rounded-xl border bg-card/50 backdrop-blur-sm shadow-sm overflow-hidden relative min-h-[400px]">
-        {loading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[2px]">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
-
-        <Table className="text-xs">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent bg-muted/30">
-              <TableHead className="w-[80px]">Ícone</TableHead>
-              <TableHead>Nome do Perfil</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead className="text-center w-[150px]">Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {profiles.length > 0
-              ? profiles.map((profile) => (
-                  <TableRow
-                    key={profile.id}
-                    className="h-14 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onDoubleClick={() => setEditingProfile(profile)}
-                  >
-                    <TableCell>
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Shield className="h-4 w-4" />
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-semibold text-sm">
-                      {profile.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground italic">
-                      {profile.description || "Cargo operacional do ERP"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 border border-green-500/20">
-                        <ShieldCheck className="h-3 w-3" />
-                        {profile.role_permissions?.length || 0} Permissões
-                      </span>
-                    </TableCell>
-                    <TableCell
-                      className="text-right"
-                      onClick={(e) => e.stopPropagation()}
+      <Table className="text-xs">
+        <TableHeader>
+          <TableRow className="hover:bg-transparent bg-muted/30">
+            <TableHead className="w-[80px]">Ícone</TableHead>
+            <TableHead>Nome do Perfil</TableHead>
+            <TableHead>Descrição</TableHead>
+            <TableHead className="text-center w-[150px]">Status</TableHead>
+            <TableHead className="text-right">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {profiles.length > 0
+            ? profiles.map((profile) => (
+              <TableRow
+                key={profile.id}
+                className="h-14 cursor-pointer hover:bg-muted/50 transition-colors"
+                onDoubleClick={() => setEditingProfile(profile)}
+              >
+                <TableCell>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                </TableCell>
+                <TableCell className="font-semibold text-sm">
+                  {profile.name}
+                </TableCell>
+                <TableCell className="text-muted-foreground italic">
+                  {profile.description || "Cargo operacional do ERP"}
+                </TableCell>
+                <TableCell className="text-center">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 border border-green-500/20">
+                    <ShieldCheck className="h-3 w-3" />
+                    {profile.role_permissions?.length || 0} Permissões
+                  </span>
+                </TableCell>
+                <TableCell
+                  className="text-right"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="p-2 hover:cursor-pointer rounded-md hover:bg-muted-foreground/20 transition-colors">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-48 rounded-xl p-2 shadow-xl border-primary/10"
                     >
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-48 rounded-xl p-2 shadow-xl border-primary/10"
+                      <DropdownMenuItem
+                        className="rounded-lg cursor-pointer py-2"
+                        onClick={() => setEditingProfile(profile)}
+                      >
+                        <Edit className="mr-2 h-4 w-4 text-primary" />
+                        Configurar Acesso
+                      </DropdownMenuItem>
+                      {hasPermission("settings:profiles:delete") && (
+                        <DropdownMenuItem
+                          className="rounded-lg cursor-pointer py-2 text-destructive focus:text-destructive focus:bg-destructive/10"
+                          onClick={() => {
+                            setProfileToDelete(profile);
+                            setDeleteAlertOpen(true);
+                          }}
                         >
-                          <DropdownMenuItem
-                            className="rounded-lg cursor-pointer py-2"
-                            onClick={() => setEditingProfile(profile)}
-                          >
-                            <Edit className="mr-2 h-4 w-4 text-primary" />
-                            Configurar Acesso
-                          </DropdownMenuItem>
-                          {hasPermission("settings:profiles:delete") && (
-                            <DropdownMenuItem
-                              className="rounded-lg cursor-pointer py-2 text-destructive focus:text-destructive focus:bg-destructive/10"
-                              onClick={() => {
-                                setProfileToDelete(profile);
-                                setDeleteAlertOpen(true);
-                              }}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Excluir Perfil
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              : !loading && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="h-32 text-center text-muted-foreground"
-                    >
-                      Nenhum perfil localizado.
-                    </TableCell>
-                  </TableRow>
-                )}
-          </TableBody>
-        </Table>
-      </div>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir Perfil
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))
+            : !loading && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="h-32 text-center text-muted-foreground"
+                >
+                  Nenhum perfil localizado.
+                </TableCell>
+              </TableRow>
+            )}
+        </TableBody>
+      </Table>
+
 
       {totalPages > 1 && (
         <VehiclePagination
@@ -246,12 +213,11 @@ export function ProfileManagerClient() {
         />
       )}
 
-      {/* Creation Dialog */}
       <ProfileDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         allPermissions={allPermissions}
-        onSuccess={loadData}
+        onSuccess={onSuccess}
       />
 
       {/* Edit Dialog */}
@@ -259,11 +225,11 @@ export function ProfileManagerClient() {
         open={!!editingProfile}
         onOpenChange={(open) => !open && setEditingProfile(null)}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
-          <DialogHeader className="px-8 py-6 border-b bg-card/50 backdrop-blur-md">
+        <DialogContent className="flex flex-col h-svh w-[100dvw] max-w-[100dvw] p-0 overflow-hidden sm:max-w-[1100px] sm:max-h-[min(90vh,850px)] sm:w-[95vw] border-none shadow-2xl">
+          <DialogHeader className="shrink-0 px-8 py-6 border-b bg-card/50 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                <Lock className="h-6 w-6" />
+                <Shield className="h-6 w-6" />
               </div>
               <div>
                 <DialogTitle className="text-2xl font-bold tracking-tight">
@@ -284,21 +250,24 @@ export function ProfileManagerClient() {
                 allPermissions={allPermissions}
                 initialPermissionSlugs={
                   editingProfile.role_permissions?.map(
-                    (p: any) => p.permission_slug,
+                    (p: { permission_slug: string }) => p.permission_slug,
                   ) || []
                 }
               />
             )}
           </div>
 
-          <DialogFooter className="shrink-0 px-8 py-4 border-t bg-card/50 backdrop-blur-md">
-            <Button
-              className="w-full rounded-xl shadow-lg shadow-primary/20"
-              onClick={() => setEditingProfile(null)}
-            >
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Fechar e Salvar Alterações
-            </Button>
+          <DialogFooter className="shrink-0 px-8 py-4 border-t bg-card/50 backdrop-blur-md mt-auto">
+            <div className="flex w-full justify-end gap-3 pb-4 pr-4">
+
+              <Button
+                className=" rounded-xl shadow-lg shadow-primary/20"
+                onClick={() => setEditingProfile(null)}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Fechar e Salvar Alterações
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -336,7 +305,7 @@ export function ProfileManagerClient() {
             <AlertDialogCancel
               disabled={isDeleting}
               type="button"
-              className="rounded-xl px-6"
+              className="rounded-xl px-6 mr-4"
             >
               Cancelar
             </AlertDialogCancel>

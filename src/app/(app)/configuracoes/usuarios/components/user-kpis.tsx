@@ -1,22 +1,19 @@
-import { createClient } from "@/utils/supabase/server"
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, UserCheck, Shield, UserMinus } from "lucide-react"
 
-export async function UserKPIs() {
-  const supabase = await createClient()
-  
-  const { data: usersData } = await supabase
-    .from("users")
-    .select("active, profile_id")
+interface UserKPIsProps {
+  data: {
+    totalUsers: number
+    activeUsers: number
+    uniqueProfiles: number
+    inactiveUsers: number
+  }
+}
 
-  const users = usersData || []
-  
-  const totalUsers = users.length
-  const activeUsers = users.filter(u => u.active).length
-  const inactiveUsers = totalUsers - activeUsers
-  
-  // Count unique profile_ids
-  const uniqueProfiles = new Set(users.map(u => u.profile_id)).size
+export function UserKPIs({ data }: UserKPIsProps) {
+  const { totalUsers, activeUsers, uniqueProfiles, inactiveUsers } = data
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

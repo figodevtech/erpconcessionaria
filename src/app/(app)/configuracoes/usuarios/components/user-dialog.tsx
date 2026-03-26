@@ -87,7 +87,7 @@ export function UserDialog({
     Object.entries(data).forEach(([key, value]) => {
       formData.append(key, value as string)
     })
-    
+
     if (isEditing) {
       formData.append("id", user.id)
     }
@@ -106,7 +106,7 @@ export function UserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col max-w-[600px] max-h-[90vh] p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="flex flex-col h-svh w-[100dvw] max-w-[100dvw] p-0 overflow-hidden sm:max-w-[1100px] sm:max-h-[min(90vh,850px)] sm:w-[95vw] border-none shadow-2xl">
         <DialogHeader className="shrink-0 px-8 py-6 border-b bg-card/50 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -128,7 +128,7 @@ export function UserDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
             <ScrollArea className="flex-1 overflow-y-auto">
-              <div className="p-8 space-y-6">
+              <div className="p-8 space-y-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
                   name="name"
@@ -155,12 +155,12 @@ export function UserDialog({
                       <FormControl>
                         <div className="relative">
                           <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input 
-                            type="email" 
-                            placeholder="joao@empresa.com" 
-                            className="pl-9" 
-                            {...field} 
-                            required 
+                          <Input
+                            type="email"
+                            placeholder="joao@empresa.com"
+                            className="pl-9"
+                            {...field}
+                            required
                             disabled={isEditing || isPending || !canUpdate}
                           />
                         </div>
@@ -199,9 +199,9 @@ export function UserDialog({
                             <SelectValue placeholder="Selecione um cargo" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <SelectContent alignItemWithTrigger={false}>
                           {profiles.map((profile) => (
-                            <SelectItem key={profile.id} value={profile.id.toString()}>
+                            <SelectItem className={"hover:cursor-pointer"} key={profile.id} value={profile.id.toString()}>
                               {profile.name}
                             </SelectItem>
                           ))}
@@ -214,8 +214,8 @@ export function UserDialog({
               </div>
             </ScrollArea>
 
-            <DialogFooter className="shrink-0 px-8 py-4 border-t bg-card/50 backdrop-blur-md">
-              <div className="flex w-full justify-end gap-3">
+            <DialogFooter className="shrink-0 px-8 py-4 border-t bg-card/50 backdrop-blur-md mt-auto">
+              <div className="flex w-full justify-end gap-3 pb-4 pr-4">
                 <Button
                   type="button"
                   variant="outline"

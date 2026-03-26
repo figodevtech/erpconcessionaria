@@ -4,19 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 
-export function UserFilters({ 
-  search, 
-  setSearch, 
-  setPage 
-}: { 
-  search: string, 
-  setSearch: (v: string) => void, 
-  setPage: (p: number) => void 
+export function UserFilters({
+  search,
+  setSearch,
+  setPage
+}: {
+  search: string,
+  setSearch: (v: string) => void,
+  setPage: (p: number) => void
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm text-muted-foreground">Filtros de Usuários</CardTitle>
+        <CardTitle className="text-sm text-muted-foreground">Filtros</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">

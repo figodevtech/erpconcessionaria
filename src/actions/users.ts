@@ -127,3 +127,30 @@ export async function listUsersAction(params?: {
   if (error) return { success: false, error: error.message }
   return { success: true, data: users, count: count || 0 }
 }
+
+export async function getUserKPIsAction() {
+  const { createClient } = await import("@/utils/supabase/server")
+  const supabase = await createClient()
+
+  const { data: usersData, error } = await supabase
+    .from("users")
+    .select("active, profile_id")
+
+  if (error) return { success: false, error: error.message }
+
+  const users = usersData || []
+  const totalUsers = users.length
+  const activeUsers = users.filter(u => u.active).length
+  const inactiveUsers = totalUsers - activeUsers
+  const uniqueProfiles = new Set(users.map(u => u.profile_id)).size
+
+  return {
+    success: true,
+    data: {
+      totalUsers,
+      activeUsers,
+      inactiveUsers,
+      uniqueProfiles
+    }
+  }
+}

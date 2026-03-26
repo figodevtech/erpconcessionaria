@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Shield, LayoutDashboard, DollarSign, Settings, Users, Car, CheckCircle2 } from "lucide-react"
+import { Loader2, Shield, LayoutDashboard, DollarSign, Settings, Users, Car, CheckCircle2, LucideIcon } from "lucide-react"
 import { createRoleAction } from "@/actions/roles"
 import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -29,7 +29,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 
-const MODULE_ICONS: Record<string, any> = {
+interface Permission {
+  id: number;
+  slug: string;
+  module: string;
+  action: string;
+  description?: string;
+}
+
+const MODULE_ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
   finance: DollarSign,
   financeiro: DollarSign,
@@ -44,7 +52,7 @@ const MODULE_ICONS: Record<string, any> = {
 interface ProfileDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  allPermissions: any[]
+  allPermissions: Permission[]
   onSuccess: () => void
 }
 
@@ -70,7 +78,7 @@ export function ProfileDialog({
     if (!acc[mod]) acc[mod] = []
     acc[mod].push(curr)
     return acc
-  }, {} as Record<string, any[]>)
+  }, {} as Record<string, Permission[]>)
 
   const handleTogglePerm = (slug: string, checked: boolean) => {
     if (checked) {
@@ -79,23 +87,26 @@ export function ProfileDialog({
       setSelectedPerms(selectedPerms.filter(s => s !== slug))
     }
   }
-
-  async function onSubmit(data: any) {
+  async function onSubmit(data: { name: string; description: string }) {
     if (selectedPerms.length === 0) {
       toast.error("Selecione pelo menos uma permissão")
       return
     }
 
     startTransition(async () => {
-      const result = await createRoleAction(data.name, data.description, selectedPerms)
-      if (result.success) {
-        toast.success("Perfil criado com sucesso")
-        onSuccess()
-        onOpenChange(false)
-        form.reset()
-        setSelectedPerms([])
-      } else {
-        toast.error("Erro: " + result.error)
+      try {
+        const result = await createRoleAction(data.name, data.description, selectedPerms)
+        if (result.success) {
+          toast.success("Perfil criado com sucesso")
+          onSuccess()
+          onOpenChange(false)
+          form.reset()
+          setSelectedPerms([])
+        } else {
+          toast.error("Erro: " + result.error)
+        }
+      } catch (e) {
+        toast.error("Erro inesperado ao criar perfil");
       }
     })
   }
@@ -104,7 +115,7 @@ export function ProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col max-w-[800px] max-h-[90vh] p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="flex flex-col h-svh w-[100dvw] max-w-[100dvw] p-0 overflow-hidden sm:max-w-[1100px] sm:max-h-[min(90vh,850px)] sm:w-[95vw] border-none shadow-2xl">
         <DialogHeader className="shrink-0 px-8 py-6 border-b bg-card/50 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -156,10 +167,10 @@ export function ProfileDialog({
                       <FormItem>
                         <FormLabel>Descrição Curta</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            placeholder="Descreva as responsabilidades deste cargo..." 
-                            className="resize-none h-24" 
-                            {...field} 
+                          <Textarea
+                            placeholder="Descreva as responsabilidades deste cargo..."
+                            className="resize-none h-24"
+                            {...field}
                           />
                         </FormControl>
                         <FormMessage />
@@ -170,7 +181,7 @@ export function ProfileDialog({
 
                 <TabsContent value="permissions" className="p-8 m-0 focus-visible:ring-0 space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(Object.entries(grouped) as [string, any[]][]).map(([module, perms]) => {
+                    {(Object.entries(grouped) as [string, Permission[]][]).map(([module, perms]) => {
                       const Icon = MODULE_ICONS[module] || Shield
                       return (
                         <div key={module} className="flex flex-col rounded-xl border bg-muted/20 overflow-hidden shadow-sm">
@@ -181,12 +192,12 @@ export function ProfileDialog({
                             </h4>
                           </div>
                           <div className="p-4 space-y-4">
-                            {perms.map((perm: any) => (
+                            {perms.map((perm) => (
                               <div key={perm.id} className="flex items-center justify-between group">
                                 <Label htmlFor={`new-${perm.slug}`} className="text-xs font-medium cursor-pointer">
                                   {capitalize(perm.action)}
                                 </Label>
-                                <Switch 
+                                <Switch
                                   id={`new-${perm.slug}`}
                                   checked={selectedPerms.includes(perm.slug)}
                                   onCheckedChange={(checked) => handleTogglePerm(perm.slug, checked)}

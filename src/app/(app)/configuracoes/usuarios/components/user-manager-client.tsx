@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { listUsersAction, deleteUserAction } from "@/actions/users"
+import { useState } from "react"
+import { deleteUserAction } from "@/actions/users"
 import {
   Table,
   TableBody,
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, User, Edit, Trash2, Loader2, UserPlus } from "lucide-react"
+import { MoreHorizontal, User, Edit, Trash2, Loader2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,49 +30,58 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
-import { UserFilters } from "./user-filters"
 import { UserDialog } from "./user-dialog"
 import { VehiclePagination } from "@/app/(app)/veiculos/components/vehicle-pagination"
 import { usePermissions } from "@/hooks/use-permissions"
 
-export function UserManagerClient({ initialProfiles }: { initialProfiles: any[] }) {
+interface Profile {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  profile_id: number;
+  active: boolean;
+  profile?: {
+    name: string;
+  };
+}
+
+interface UserManagerClientProps {
+  users: UserProfile[]
+  loading: boolean
+  onSuccess: () => void
+  page: number
+  setPage: (p: number) => void
+  count: number
+  pageSize: number
+  initialProfiles: Profile[]
+}
+
+export function UserManagerClient({
+  users,
+  loading,
+  onSuccess,
+  page,
+  setPage,
+  count,
+  pageSize,
+  initialProfiles
+}: UserManagerClientProps) {
   const { hasPermission } = usePermissions()
-  const [users, setUsers] = useState<any[]>([])
-  const [count, setCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState("")
-  const [page, setPage] = useState(1)
-  const pageSize = 10
 
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<any | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null)
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false)
-  const [userToDelete, setUserToDelete] = useState<any | null>(null)
+  const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true)
-    const result = await listUsersAction({ page, pageSize, search })
-    if (result.success) {
-      setUsers(result.data || [])
-      setCount(result.count || 0)
-    } else {
-      toast.error("Erro ao carregar usuários")
-    }
-    setLoading(false)
-  }, [page, search])
-
-  useEffect(() => {
-    loadUsers()
-  }, [loadUsers])
-
-  const handleEdit = (user: any) => {
+  const handleEdit = (user: UserProfile) => {
     setSelectedUser(user)
-    setDialogOpen(true)
-  }
-
-  const handleNew = () => {
-    setSelectedUser(null)
     setDialogOpen(true)
   }
 
@@ -82,7 +91,7 @@ export function UserManagerClient({ initialProfiles }: { initialProfiles: any[] 
     const result = await deleteUserAction(userToDelete.id)
     if (result.success) {
       toast.success("Usuário excluído")
-      loadUsers()
+      onSuccess()
     } else {
       toast.error("Erro ao excluir: " + result.error)
     }
@@ -95,111 +104,91 @@ export function UserManagerClient({ initialProfiles }: { initialProfiles: any[] 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Lista de Usuários</h2>
-        {hasPermission("settings:users:create") && (
-          <Button onClick={handleNew} size="sm" className="rounded-xl shadow-lg">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Novo Usuário
-          </Button>
-        )}
-      </div>
-
-      <UserFilters search={search} setSearch={setSearch} setPage={setPage} />
-
-      <div className="rounded-xl border bg-card/50 backdrop-blur-sm shadow-sm overflow-hidden relative min-h-[400px]">
-        {loading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[2px]">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
-        
-        <Table className="text-xs">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent bg-muted/30">
-              <TableHead className="w-[80px]">Avatar</TableHead>
-              <TableHead>Nome</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>Perfil</TableHead>
-              <TableHead className="text-center">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.length > 0 ? (
-              users.map((user) => (
-                <TableRow 
-                  key={user.id} 
-                  className="h-14 cursor-pointer hover:bg-muted/50 transition-colors"
-                  onDoubleClick={() => handleEdit(user)}
-                >
-                  <TableCell>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <User className="h-4 w-4" />
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium text-sm">
-                    {user.name || "Sem Nome"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-normal border-primary/20 bg-primary/5 text-primary">
-                      {user.profile?.name || "Sem Perfil"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      } />
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(user)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
+      <Table className="text-xs">
+        <TableHeader>
+          <TableRow className="hover:bg-transparent bg-muted/30">
+            <TableHead className="w-[80px]">Avatar</TableHead>
+            <TableHead>Nome</TableHead>
+            <TableHead>E-mail</TableHead>
+            <TableHead>Perfil</TableHead>
+            <TableHead className="text-center">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {users.length > 0 ? (
+            users.map((user) => (
+              <TableRow
+                key={user.id}
+                className="h-14 cursor-pointer hover:bg-muted/50 transition-colors"
+                onDoubleClick={() => handleEdit(user)}
+              >
+                <TableCell>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <User className="h-4 w-4" />
+                  </div>
+                </TableCell>
+                <TableCell className="font-medium text-sm">
+                  {user.name || "Sem Nome"}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="font-normal border-primary/20 bg-primary/5 text-primary">
+                    {user.profile?.name || "Sem Perfil"}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    } />
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEdit(user)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar
+                      </DropdownMenuItem>
+                      {hasPermission("settings:users:delete") && (
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => {
+                            setUserToDelete(user)
+                            setDeleteAlertOpen(true)
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
                         </DropdownMenuItem>
-                        {hasPermission("settings:users:delete") && (
-                          <DropdownMenuItem 
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => {
-                              setUserToDelete(user)
-                              setDeleteAlertOpen(true)
-                            }}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : !loading && (
-              <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                  Nenhum usuário encontrado.
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+            ))
+          ) : !loading && (
+            <TableRow>
+              <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                Nenhum usuário encontrado.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
 
       {totalPages > 1 && (
         <VehiclePagination page={page} totalPages={totalPages} setPage={setPage} />
       )}
 
-      <UserDialog 
-        open={dialogOpen} 
-        onOpenChange={setDialogOpen} 
-        user={selectedUser} 
+      <UserDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        user={selectedUser}
         profiles={initialProfiles}
-        onSuccess={loadUsers}
+        onSuccess={onSuccess}
       />
 
-      <AlertDialog 
-        open={deleteAlertOpen} 
+      <AlertDialog
+        open={deleteAlertOpen}
         onOpenChange={(open) => {
           setDeleteAlertOpen(open)
           if (!open) setUserToDelete(null)
@@ -213,8 +202,8 @@ export function UserManagerClient({ initialProfiles }: { initialProfiles: any[] 
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting} type="button">Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogCancel className={"mr-2"} disabled={isDeleting} type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault()
                 handleDelete()

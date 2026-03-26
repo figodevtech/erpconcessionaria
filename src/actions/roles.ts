@@ -69,7 +69,7 @@ export async function createRoleAction(name: string, description: string, permis
   const supabase = await createClient()
 
   // 1. Create Profile
-  const { data: role, error: roleError } = await supabase
+  const { error: roleError } = await supabase
     .from("profiles")
     .insert({ name, description })
     .select()
@@ -110,4 +110,39 @@ export async function deleteRoleAction(roleId: number) {
 
   revalidatePath("/configuracoes/perfis")
   return { success: true }
+}
+
+export async function getProfileKPIsAction() {
+  const supabase = await createClient()
+
+  // 1. Get total profiles and their counts
+  const { data: profiles, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, role_permissions(id)")
+
+  if (profileError) return { success: false, error: profileError.message }
+
+  // 2. Get total users to see how they are distributed (optional but good for KPIs)
+  const { data: users, error: userError } = await supabase
+    .from("users")
+    .select("profile_id")
+
+  if (userError) return { success: false, error: userError.message }
+
+  const totalProfiles = profiles?.length || 0
+  const totalPermissions = profiles?.reduce((acc, p) => acc + (p.role_permissions?.length || 0), 0) || 0
+  const avgPermissions = totalProfiles > 0 ? Math.round(totalPermissions / totalProfiles) : 0
+  
+  // Count how many profiles are actually assigned to users
+  const assignedProfiles = new Set(users?.map(u => u.profile_id)).size
+
+  return {
+    success: true,
+    data: {
+      totalProfiles,
+      totalPermissions,
+      avgPermissions,
+      assignedProfiles
+    }
+  }
 }
