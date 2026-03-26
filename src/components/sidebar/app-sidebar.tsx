@@ -64,7 +64,7 @@ const data = {
       items: [
         {
           title: "Banners",
-          url: "#",
+          url: "/marketing/banners",
           icon: PanelsTopLeft,
           slug: "banners:view",
         },
