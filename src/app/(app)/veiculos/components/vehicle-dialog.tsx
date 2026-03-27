@@ -257,7 +257,7 @@ export function VehicleDialog({
             fuel: updatedVehicle.fuel || "",
             transmission: updatedVehicle.transmission || "",
             color: updatedVehicle.color || "",
-            doors: updatedVehicle.doors || 4,
+            doors: updatedVehicle.doors ?? 4,
             body_type: updatedVehicle.body_type || "",
             image: updatedVehicle.image || "",
             city: updatedVehicle.city || "",
@@ -438,6 +438,10 @@ export function VehicleDialog({
 
     requiredFields.forEach((field) => {
       const value = values[field.key as keyof VehicleFormValues];
+      
+      // Skip doors for motorcycles
+      if (field.key === "doors" && values.type === "motorcycles") return;
+
       if (value === undefined || value === null || value === "") {
         if (field.key === "price" && (value as any) === 0) return; // Special case: Allow 0 price
         form.setError(field.key as any, { type: "manual", message: `${field.label} é obrigatório(a)` });
@@ -550,7 +554,7 @@ export function VehicleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col h-svh w-[100dvw] max-w-[100dvw] p-0 overflow-hidden sm:max-w-[1100px] sm:max-h-[min(90vh,850px)] sm:w-[95vw] border-none shadow-2xl">
+      <DialogContent className="flex flex-col h-svh w-dvw max-w-dvw p-0 overflow-hidden sm:max-w-[1100px] sm:max-h-[min(90vh,850px)] sm:w-[95vw] border-none shadow-2xl">
         {fetching && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm transition-all animate-in fade-in duration-200">
             <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-card border shadow-lg">
@@ -988,6 +992,13 @@ function GeneralTab({
                     form.setValue("brand", "");
                     form.setValue("model", "");
                     form.setValue("version", "");
+                    if (val === "motorcycles") {
+                      form.setValue("body_type", "Moto", { shouldValidate: true });
+                      form.setValue("doors", 0, { shouldValidate: true });
+                    } else if (form.getValues("body_type") === "Moto") {
+                      form.setValue("body_type", "");
+                      form.setValue("doors", "" as any);
+                    }
                   }}
                   value={field.value === "cars" ? "Carros/Utilitários/SUV" : field.value === "motorcycles" ? "Motos" : field.value === "trucks" ? "Caminhões" : ""}
                   disabled={loading || loadingFipe}
@@ -1415,6 +1426,7 @@ function GeneralTab({
                     <SelectItem value="Diesel">Diesel</SelectItem>
                     <SelectItem value="Híbrido">Híbrido</SelectItem>
                     <SelectItem value="Elétrico">Elétrico</SelectItem>
+                    <SelectItem value="Elétrico/Gasolina">Elétrico/Gasolina</SelectItem>
                   </SelectContent>
                 </Select>
               </FormItem>
@@ -1482,31 +1494,33 @@ function GeneralTab({
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="doors"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className={cn(
-                  "text-xs font-bold uppercase tracking-wider text-muted-foreground",
-                  form.formState.errors.doors && "text-destructive"
-                )}>
-                  Portas *
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    {...field}
-                    disabled={loading}
-                    className={cn(
-                      "bg-background/50 rounded-lg h-10",
-                      form.formState.errors.doors && "border-destructive ring-1 ring-destructive"
-                    )}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
+          {form.watch("type") !== "motorcycles" && (
+            <FormField
+              control={form.control}
+              name="doors"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={cn(
+                    "text-xs font-bold uppercase tracking-wider text-muted-foreground",
+                    form.formState.errors.doors && "text-destructive"
+                  )}>
+                    Portas *
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      disabled={loading}
+                      className={cn(
+                        "bg-background/50 rounded-lg h-10",
+                        form.formState.errors.doors && "border-destructive ring-1 ring-destructive"
+                      )}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          )}
 
           <FormField
             control={form.control}
@@ -1540,6 +1554,7 @@ function GeneralTab({
                     <SelectItem value="Coupe">Coupe</SelectItem>
                     <SelectItem value="Conversível">Conversível</SelectItem>
                     <SelectItem value="Van">Van</SelectItem>
+                    <SelectItem value="Moto">Moto</SelectItem>
                   </SelectContent>
                 </Select>
               </FormItem>
