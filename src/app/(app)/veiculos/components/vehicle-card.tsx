@@ -98,10 +98,10 @@ export function VehicleCard({
   return (
     <>
       <Card
-        className="group pt-0 overflow-hidden border-border bg-card transition-all hover:shadow-lg h-full hover:cursor-pointer"
+        className="group pt-0 overflow-hidden border-border bg-card transition-all hover:shadow-lg h-full flex flex-col hover:cursor-pointer"
         onDoubleClick={() => onEdit?.(vehicle)}
       >
-        <div className="relative aspect-16/10 overflow-hidden">
+        <div className="relative aspect-16/10 overflow-hidden shrink-0">
           <Image
             src={vehicle.image}
             alt={`${vehicle.brand} ${vehicle.model} ${vehicle.version}`}
@@ -135,7 +135,7 @@ export function VehicleCard({
           )}
         </div>
 
-        <CardContent className="pt-4">
+        <CardContent className="pt-4 flex flex-col flex-grow">
           <div className="flex justify-end mb-2 -mt-2">
             <Badge
               variant="outline"
@@ -188,7 +188,7 @@ export function VehicleCard({
               </span>
             </div>
           </div>
-          <div className="w-full">
+          <div className="w-full mt-auto pt-4">
             <DropdownMenu>
               <DropdownMenuTrigger
                 className="mt-2 bg-muted/60 backdrop-blur-sm border border-border w-full py-2 rounded-md flex items-center justify-center transition-colors hover:bg-muted"
