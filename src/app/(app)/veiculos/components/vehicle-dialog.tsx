@@ -148,7 +148,7 @@ export interface VehicleFormValues {
   engine_size?: string | null;
   horsepower?: number | null;
   is_new: boolean;
-  status: "Em venda" | "Vendido" | "Rascunho" | "Pagamento";
+  status: "Em venda" | "Em breve" | "Vendido" | "Rascunho" | "Pagamento";
   featured: boolean;
   plate: string;
 }
@@ -438,7 +438,7 @@ export function VehicleDialog({
 
     requiredFields.forEach((field) => {
       const value = values[field.key as keyof VehicleFormValues];
-      
+
       // Skip doors for motorcycles
       if (field.key === "doors" && values.type === "motorcycles") return;
 
@@ -788,8 +788,8 @@ function GeneralTab({
         const cleanPriceString = priceData.price.replace(/[^\d,]/g, '').replace(',', '.');
         const priceNumber = parseFloat(cleanPriceString);
         if (!isNaN(priceNumber)) {
-           form.setValue("fipe", priceNumber, { shouldValidate: true, shouldDirty: true });
-           toast.success("Preço base da FIPE preenchido!");
+          form.setValue("fipe", priceNumber, { shouldValidate: true, shouldDirty: true });
+          toast.success("Preço base da FIPE preenchido!");
         }
       }
     } catch (error: any) {
@@ -966,6 +966,7 @@ function GeneralTab({
                     </FormControl>
                     <SelectContent alignItemWithTrigger={false}>
                       <SelectItem value="Em venda">Em venda</SelectItem>
+                      <SelectItem value="Em breve">Em breve</SelectItem>
                       <SelectItem value="Vendido">Vendido</SelectItem>
                       <SelectItem value="Rascunho">Rascunho</SelectItem>
                       <SelectItem value="Pagamento">Pagamento</SelectItem>
@@ -2086,7 +2087,7 @@ function VideoCard({
         controls
         controlsList="nodownload"
       />
-      
+
       <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 pointer-events-none">
         <div className="bg-primary/95 backdrop-blur-md text-[10px] font-bold text-primary-foreground px-2 py-0.5 rounded-full shadow-lg border border-white/10 uppercase tracking-wider w-fit">
           {type === "shorts" ? "Short (Mobile)" : "Apresentação (Web)"}
@@ -2139,7 +2140,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
         // Obter o path do bucket através da decodificação da URL pública do supabase (removendo a base URL até o final do nome do bucket)
         const pathMatch = videoRecord.url.match(/vehicles\/(.+)/);
         const path = pathMatch ? decodeURIComponent(pathMatch[1]) : `${folderPath}/`;
-        
+
         setVideoFile({ id: videoRecord.id, url: videoRecord.url, path });
       } else {
         setVideoFile(null);
@@ -2171,7 +2172,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
 
     try {
       setUploading(true);
-      
+
       // Remove previously existing video to keep max 1 constraint
       if (videoFile?.path) {
         await supabase.storage.from("vehicles").remove([videoFile.path]);
@@ -2225,10 +2226,10 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
 
   const handleDelete = async () => {
     if (!videoFile?.path) return;
-    
+
     try {
       setDeleting(true);
-      
+
       // Delete from DB first
       if (videoFile.id) {
         const response = await fetch(`/api/vehicles/videos?id=${videoFile.id}`, {
@@ -2240,7 +2241,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
       // Delete from Storage
       const { error } = await supabase.storage.from("vehicles").remove([videoFile.path]);
       if (error) throw error;
-      
+
       setVideoFile(null);
       toast.success("Vídeo removido com sucesso!");
     } catch (error) {
@@ -2255,7 +2256,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
     return (
       <div className={cn(
         "flex bg-muted/20 items-center justify-center border rounded-2xl h-40",
-         type === "shorts" ? "max-w-[280px] mx-auto aspect-9/16 h-auto" : "w-full aspect-video h-auto"
+        type === "shorts" ? "max-w-[280px] mx-auto aspect-9/16 h-auto" : "w-full aspect-video h-auto"
       )}>
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
@@ -2286,7 +2287,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
             onDelete={() => setShowDeleteAlert(true)}
             deleting={deleting}
           />
-          
+
           <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
             <AlertDialogContent className="rounded-3xl border-primary/10 shadow-2xl">
               <AlertDialogHeader>
@@ -2322,7 +2323,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
           </AlertDialog>
         </>
       ) : (
-        <div 
+        <div
           onClick={() => !uploading && fileInputRef.current?.click()}
           className={cn(
             "flex flex-col items-center justify-center border-2 border-dashed border-primary/20 rounded-2xl bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer",
@@ -2670,185 +2671,185 @@ function MediaTab({
       <div className="space-y-6">
         <div className="flex items-center justify-between border-b border-primary/10 pb-2">
           <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-primary/10 text-primary shadow-sm">
-            <Camera className="h-4 w-4" />
+            <div className="p-2.5 rounded-xl bg-primary/10 text-primary shadow-sm">
+              <Camera className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-md font-bold tracking-tight">Galeria de Fotos</h3>
+              <p className="text-xs text-muted-foreground">
+                {mixedImages.length}{" "}
+                {mixedImages.length === 1 ? "imagem encontrada" : "imagens encontradas"}{" "}
+                para este veículo
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-md font-bold tracking-tight">Galeria de Fotos</h3>
-            <p className="text-xs text-muted-foreground">
-              {mixedImages.length}{" "}
-              {mixedImages.length === 1 ? "imagem encontrada" : "imagens encontradas"}{" "}
-              para este veículo
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            className="hidden"
-            multiple
-            accept="image/*"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-xl border-primary/20 hover:bg-primary/5 gap-2"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Adicionar Imagens
-          </Button>
-
-          {hasLocalImages && (
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              multiple
+              accept="image/*"
+            />
             <Button
               type="button"
+              variant="outline"
               size="sm"
-              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-lg shadow-blue-500/20"
-              onClick={uploadImages}
-              disabled={uploading}
+              className="rounded-xl border-primary/20 hover:bg-primary/5 gap-2"
+              onClick={() => fileInputRef.current?.click()}
             >
-              {uploading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Upload className="h-3.5 w-3.5" />
-              )}
-              Realizar Upload
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar Imagens
             </Button>
-          )}
-        </div>
-      </div>
 
-      <div>
-
-        {mixedImages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 px-4 border-2 border-dashed rounded-3xl border-primary/10 bg-muted/5">
-            <ImageIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <p className="text-sm text-dotted text-muted-foreground font-medium text-center">
-              Nenhuma foto adicional encontrada.
-              <br />
-              As fotos enviadas aparecerão aqui.
-            </p>
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={[snapCenterToCursor]}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={mixedImages.map((img) => img.id)}
-              strategy={rectSortingStrategy}
-            >
-              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                {mixedImages.map((image, index) => (
-                  <SortableImage
-                    key={image.id}
-                    image={image}
-                    index={index}
-                    mainImageUrl={mainImageUrl}
-                    onDelete={(id) => {
-                      const img = mixedImages.find(i => i.id === id);
-                      if (img?.isLocal) {
-                        handleDelete(id);
-                      } else {
-                        setConfirmDeleteId(id);
-                      }
-                    }}
-                    onSetMain={(url) => {
-                      form.setValue("image", url);
-                      toast.success("Foto principal atualizada!");
-                    }}
-                    deletingId={deletingId}
-                    selectedImageId={selectedImageId}
-                    onToggleControls={(id) => {
-                      setSelectedImageId(prev => (prev === id ? null : id));
-                    }}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-
-            <DragOverlay
-              modifiers={[restrictToWindowEdges]}
-              dropAnimation={{
-                sideEffects: defaultDropAnimationSideEffects({
-                  styles: {
-                    active: {
-                      opacity: "0.5",
-                    },
-                  },
-                }),
-              }}
-            >
-              {activeImage ? (
-                <ImageCard
-                  image={activeImage}
-                  index={activeIndex}
-                  mainImageUrl={mainImageUrl}
-                  isOverlay
-                />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        )}
-
-        {/* Info Card */}
-        <div className="mt-4 py-2 px-2 rounded-2xl bg-linear-to-br from-primary/5 to-transparent border border-primary/10 flex items-start gap-4">
-          <div className="p-2 rounded-lg bg-background shadow-sm mt-1">
-            <Info className="h-4 w-4 text-primary" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-sm font-bold">Gerenciamento de Imagens</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              As imagens selecionadas localmente podem ser reordenadas antes do envio. Clique em "Realizar Upload" para salvar permanentemente.
-            </p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Dica: Arraste novas imagens para dentro da janela e adicione-as ao veículo.
-            </p>
+            {hasLocalImages && (
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-lg shadow-blue-500/20"
+                onClick={uploadImages}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
+                Realizar Upload
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog
-          open={!!confirmDeleteId}
-          onOpenChange={(open: boolean) => !open && setConfirmDeleteId(null)}
-        >
-          <AlertDialogContent className="rounded-3xl border-primary/10 shadow-2xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
-                  <Trash2 className="h-5 w-5" />
+        <div>
+
+          {mixedImages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 px-4 border-2 border-dashed rounded-3xl border-primary/10 bg-muted/5">
+              <ImageIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
+              <p className="text-sm text-dotted text-muted-foreground font-medium text-center">
+                Nenhuma foto adicional encontrada.
+                <br />
+                As fotos enviadas aparecerão aqui.
+              </p>
+            </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              modifiers={[snapCenterToCursor]}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={mixedImages.map((img) => img.id)}
+                strategy={rectSortingStrategy}
+              >
+                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                  {mixedImages.map((image, index) => (
+                    <SortableImage
+                      key={image.id}
+                      image={image}
+                      index={index}
+                      mainImageUrl={mainImageUrl}
+                      onDelete={(id) => {
+                        const img = mixedImages.find(i => i.id === id);
+                        if (img?.isLocal) {
+                          handleDelete(id);
+                        } else {
+                          setConfirmDeleteId(id);
+                        }
+                      }}
+                      onSetMain={(url) => {
+                        form.setValue("image", url);
+                        toast.success("Foto principal atualizada!");
+                      }}
+                      deletingId={deletingId}
+                      selectedImageId={selectedImageId}
+                      onToggleControls={(id) => {
+                        setSelectedImageId(prev => (prev === id ? null : id));
+                      }}
+                    />
+                  ))}
                 </div>
-                Confirmar Exclusão
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-sm py-2">
-                Tem certeza que deseja remover esta imagem? Esta ação não pode ser
-                desfeita e a foto será excluída permanentemente.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="gap-3 sm:gap-4 mt-2">
-              <AlertDialogCancel
-                className="rounded-xl border-primary/10 hover:bg-muted transition-colors px-6"
-                onClick={() => setConfirmDeleteId(null)}
+              </SortableContext>
+
+              <DragOverlay
+                modifiers={[restrictToWindowEdges]}
+                dropAnimation={{
+                  sideEffects: defaultDropAnimationSideEffects({
+                    styles: {
+                      active: {
+                        opacity: "0.5",
+                      },
+                    },
+                  }),
+                }}
               >
-                Cancelar
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className="rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors shadow-lg shadow-destructive/20 px-6"
-                onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}
-              >
-                Excluir Permanentemente
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+                {activeImage ? (
+                  <ImageCard
+                    image={activeImage}
+                    index={activeIndex}
+                    mainImageUrl={mainImageUrl}
+                    isOverlay
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          )}
+
+          {/* Info Card */}
+          <div className="mt-4 py-2 px-2 rounded-2xl bg-linear-to-br from-primary/5 to-transparent border border-primary/10 flex items-start gap-4">
+            <div className="p-2 rounded-lg bg-background shadow-sm mt-1">
+              <Info className="h-4 w-4 text-primary" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold">Gerenciamento de Imagens</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                As imagens selecionadas localmente podem ser reordenadas antes do envio. Clique em "Realizar Upload" para salvar permanentemente.
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Dica: Arraste novas imagens para dentro da janela e adicione-as ao veículo.
+              </p>
+            </div>
+          </div>
+
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog
+            open={!!confirmDeleteId}
+            onOpenChange={(open: boolean) => !open && setConfirmDeleteId(null)}
+          >
+            <AlertDialogContent className="rounded-3xl border-primary/10 shadow-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  Confirmar Exclusão
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm py-2">
+                  Tem certeza que deseja remover esta imagem? Esta ação não pode ser
+                  desfeita e a foto será excluída permanentemente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-3 sm:gap-4 mt-2">
+                <AlertDialogCancel
+                  className="rounded-xl border-primary/10 hover:bg-muted transition-colors px-6"
+                  onClick={() => setConfirmDeleteId(null)}
+                >
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  className="rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors shadow-lg shadow-destructive/20 px-6"
+                  onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+                >
+                  Excluir Permanentemente
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       {/* Seção de Vídeos */}

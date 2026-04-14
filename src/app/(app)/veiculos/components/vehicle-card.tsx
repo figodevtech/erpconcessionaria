@@ -49,6 +49,8 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case "Em venda":
       return "bg-blue-500/10 text-blue-500";
+    case "Em breve":
+      return "bg-purple-500/10 text-purple-500";
     case "Vendido":
       return "bg-green-500/10 text-green-500";
     case "Rascunho":

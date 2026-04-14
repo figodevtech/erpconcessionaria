@@ -13,7 +13,7 @@ import { VehicleDialog } from "./vehicle-dialog"
 import { usePermissions } from "@/hooks/use-permissions"
 
 export type SellerType = "dealership" | "store" | "private";
-export type VehicleStatus = "Em venda" | "Vendido" | "Rascunho" | "Pagamento";
+export type VehicleStatus = "Em venda" | "Em breve" | "Vendido" | "Rascunho" | "Pagamento";
 
 export interface Vehicle {
   id: string;
