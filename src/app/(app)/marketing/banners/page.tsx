@@ -9,6 +9,7 @@ import {
 } from "@/actions/banners";
 import { BannerUploader } from "@/components/marketing/banner-uploader";
 import { BannerList } from "./components/banner-list";
+import { BannerSettings } from "./components/banner-settings";
 import { toast } from "sonner";
 import {
   Plus,
@@ -127,6 +128,9 @@ export default function BannersPage() {
           )}
         </Button>
       </div>
+
+      {/* Banner Settings Section */}
+      <BannerSettings />
 
       {/* Uploader Section */}
       {showUploader && (
