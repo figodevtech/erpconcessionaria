@@ -2,9 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// OpenAI instance will be created inside the route handler
 
 export async function POST(request: Request) {
   try {
@@ -39,8 +37,8 @@ export async function POST(request: Request) {
     // Buscar configurações atuais
     const { data: settings, error: settingsError } = await supabase
       .from("app_settings")
-      .select("ai_description_monthly_limit, ai_description_usage_count, ai_description_last_reset")
-      .eq("user_id", user.id)
+      .select("id, ai_description_monthly_limit, ai_description_usage_count, ai_description_last_reset")
+      .limit(1)
       .single();
 
     if (settingsError && settingsError.code !== 'PGRST116') {
@@ -54,14 +52,16 @@ export async function POST(request: Request) {
     // Lógica de Auto-Reset: Se o mês mudou, zera o contador
     if (!lastReset || lastReset !== currentMonth) {
       used = 0;
-      await supabase
-        .from("app_settings")
-        .upsert({ 
-          user_id: user.id, 
-          ai_description_usage_count: 0,
-          ai_description_last_reset: currentMonth,
-          updated_at: new Date().toISOString()
-        });
+      if (settings?.id) {
+        await supabase
+          .from("app_settings")
+          .update({ 
+            ai_description_usage_count: 0,
+            ai_description_last_reset: currentMonth,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", settings.id);
+      }
     }
 
     // ETAPA 6: Otimização do Controle de Cotas (Persistent Counter)
@@ -81,6 +81,10 @@ export async function POST(request: Request) {
 
     // 3. Gerar descrição com IA real via OpenAI
     const featuresList = (vehicle.features || []).join(", ");
+    
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
     
     // ... rest of the OpenAI call ... (already updated by user previously)
     const response = await openai.chat.completions.create({
@@ -127,15 +131,19 @@ export async function POST(request: Request) {
     }
 
     // 5. Incrementar contador e registrar log
-    // Usar upsert para garantir que o registro exista e seja incrementado
-    const { error: settingsUpdateError } = await supabase
-      .from("app_settings")
-      .upsert({ 
-        user_id: user.id,
-        ai_description_usage_count: used + 1,
-        ai_description_last_reset: currentMonth,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' });
+    // Usar update para garantir que o registro seja incrementado
+    let settingsUpdateError = null;
+    if (settings?.id) {
+      const { error } = await supabase
+        .from("app_settings")
+        .update({ 
+          ai_description_usage_count: used + 1,
+          ai_description_last_reset: currentMonth,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", settings.id);
+      settingsUpdateError = error;
+    }
 
     if (settingsUpdateError) {
       console.error("Erro ao atualizar contador:", settingsUpdateError);
@@ -189,8 +197,8 @@ export async function GET(request: Request) {
     // Buscar estatísticas do app_settings
     const { data: settings } = await supabase
       .from("app_settings")
-      .select("ai_description_monthly_limit, ai_description_usage_count, ai_description_last_reset")
-      .eq("user_id", user.id)
+      .select("id, ai_description_monthly_limit, ai_description_usage_count, ai_description_last_reset")
+      .limit(1)
       .single();
 
     const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
