@@ -24,6 +24,7 @@ export interface Vehicle {
   year: number;
   year_model: number;
   price: number;
+  purchase_price?: number | null;
   fipe?: number | null;
   mileage?: number | null;
   fuel: string;

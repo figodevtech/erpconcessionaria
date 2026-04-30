@@ -120,6 +120,8 @@ import {
 import { AIDescriptionBox } from "./ai-description-box";
 import { formatCurrency, parseCurrency } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
+import { VehicleFinanceTab } from "./vehicle-finance-tab";
+import { VehicleAttachmentsTab } from "./vehicle-attachments-tab";
 
 export interface VehicleFormValues {
   type: string;
@@ -129,6 +131,7 @@ export interface VehicleFormValues {
   year: number | "";
   year_model: number | "";
   price: number;
+  purchase_price?: number | null;
   fipe?: number | null;
   mileage?: number | null;
   fuel: string;
@@ -187,6 +190,7 @@ export function VehicleDialog({
       year: "" as any,
       year_model: "" as any,
       price: 0,
+      purchase_price: null,
       fipe: null,
       mileage: null,
       fuel: "",
@@ -252,6 +256,7 @@ export function VehicleDialog({
             year: updatedVehicle.year || new Date().getFullYear(),
             year_model: updatedVehicle.year_model || new Date().getFullYear(),
             price: updatedVehicle.price || 0,
+            purchase_price: updatedVehicle.purchase_price || null,
             fipe: updatedVehicle.fipe || null,
             mileage: updatedVehicle.mileage || null,
             fuel: updatedVehicle.fuel || "",
@@ -296,6 +301,7 @@ export function VehicleDialog({
         year: "" as any,
         year_model: "" as any,
         price: 0,
+        purchase_price: null,
         fipe: null,
         mileage: null,
         fuel: "",
@@ -417,6 +423,7 @@ export function VehicleDialog({
       { key: "version", label: "Versão" },
       { key: "year", label: "Ano Fabr." },
       { key: "year_model", label: "Ano Modelo" },
+      { key: "purchase_price", label: "Preço Compra" },
       { key: "price", label: "Preço" },
       { key: "fuel", label: "Combustível" },
       { key: "transmission", label: "Transmissão" },
@@ -443,7 +450,7 @@ export function VehicleDialog({
       if (field.key === "doors" && values.type === "motorcycles") return;
 
       if (value === undefined || value === null || value === "") {
-        if (field.key === "price" && (value as any) === 0) return; // Special case: Allow 0 price
+        if ((field.key === "price" || field.key === "purchase_price") && (value as any) === 0) return; // Special case: Allow 0 price
         form.setError(field.key as any, { type: "manual", message: `${field.label} é obrigatório(a)` });
         errorMessages.push(`${field.label} é obrigatório(a)`);
         hasError = true;
@@ -609,6 +616,22 @@ export function VehicleDialog({
                   </TabsTrigger>
                   {vehicle?.id && (
                     <TabsTrigger
+                      value="Financeiro"
+                      className={"px-6 rounded-lg transition-all" + tabTheme}
+                    >
+                      Financeiro
+                    </TabsTrigger>
+                  )}
+                  {vehicle?.id && (
+                    <TabsTrigger
+                      value="Anexos"
+                      className={"px-6 rounded-lg transition-all" + tabTheme}
+                    >
+                      Anexos
+                    </TabsTrigger>
+                  )}
+                  {vehicle?.id && (
+                    <TabsTrigger
                       value="Mídia"
                       className={"px-6 rounded-lg transition-all" + tabTheme}
                     >
@@ -649,6 +672,28 @@ export function VehicleDialog({
                   />
                 </ScrollArea>
               </TabsContent>
+
+              {vehicle?.id && (
+                <TabsContent
+                  className="flex-1 min-h-0 overflow-hidden p-0"
+                  value="Financeiro"
+                >
+                  <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
+                    <VehicleFinanceTab vehicle={vehicle} />
+                  </ScrollArea>
+                </TabsContent>
+              )}
+
+              {vehicle?.id && (
+                <TabsContent
+                  className="flex-1 min-h-0 overflow-hidden p-0"
+                  value="Anexos"
+                >
+                  <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
+                    <VehicleAttachmentsTab vehicle={vehicle} />
+                  </ScrollArea>
+                </TabsContent>
+              )}
 
               {vehicle?.id && (
                 <TabsContent
@@ -1258,6 +1303,42 @@ function GeneralTab({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <FormField
             control={form.control}
+            name="purchase_price"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className={cn(
+                  "text-xs font-bold uppercase tracking-wider",
+                  form.formState.errors.purchase_price && "text-destructive"
+                )}>
+                  Preço Compra (R$) *
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="text"
+                    disabled={loading}
+                    placeholder="R$ 0,00"
+                    className={cn(
+                      "bg-primary/5 border-primary/20 rounded-lg h-10 font-semibold",
+                      form.formState.errors.purchase_price && "border-destructive ring-1 ring-destructive"
+                    )}
+                    value={field.value ? formatCurrency(field.value) : ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Permitir apenas números e pontuação de moeda
+                      const numericValue = value.replace(/\D/g, "");
+                      if (numericValue) {
+                        field.onChange(Number(numericValue) / 100);
+                      } else {
+                        field.onChange(0);
+                      }
+                    }}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
             name="price"
             render={({ field }) => (
               <FormItem>
@@ -1265,12 +1346,13 @@ function GeneralTab({
                   "text-xs font-bold uppercase tracking-wider text-primary",
                   form.formState.errors.price && "text-destructive"
                 )}>
-                  Preço (R$) *
+                  Preço Venda (R$) *
                 </FormLabel>
                 <FormControl>
                   <Input
                     type="text"
                     disabled={loading}
+                    placeholder="R$ 0,00"
                     className={cn(
                       "bg-primary/5 border-primary/20 rounded-lg h-10 font-semibold",
                       form.formState.errors.price && "border-destructive ring-1 ring-destructive"
@@ -1303,6 +1385,7 @@ function GeneralTab({
                 <FormControl>
                   <div className="relative">
                     <Input
+                    placeholder="R$ 0,00"
                       type="text"
                       disabled={loading}
                       className="bg-background/50 rounded-lg h-10"

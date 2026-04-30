@@ -9,6 +9,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 const routeTitles: Record<string, string> = {
   "/": "Dashboard",
   "/clientes": "Clientes",
+  "/financeiro": "Fluxo de Caixa",
+  "/tipos": "Tipos",
   "/veiculos": "Veículos",
 };
 
@@ -19,6 +21,8 @@ function humanize(path: string) {
 
   const dic: Record<string, string> = {
     clientes: "Clientes",
+    financeiro: "Fluxo de Caixa",
+    tipos: "Tipos",
     veiculos: "Veículos",
   };
 

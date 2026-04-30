@@ -12,11 +12,10 @@ import {
   Users,
   Settings2,
   PanelsTopLeft,
-  PanelTopBottomDashed,
-  PanelTop,
   Globe,
+  WalletCards,
+  Layers3,
 } from "lucide-react";
-import { usePathname } from "next/navigation";
 import { NavMain } from "./components/nav-main";
 import { NavSettings } from "./components/nav-settings";
 import { NavUser } from "./components/nav-user";
@@ -52,6 +51,18 @@ const data = {
       url: "/veiculos",
       icon: Car,
       slug: "vehicles:view",
+    },
+    {
+      title: "Fluxo de Caixa",
+      url: "/financeiro",
+      icon: WalletCards,
+      slug: "finance:view",
+    },
+    {
+      title: "Tipos",
+      url: "/tipos",
+      icon: Layers3,
+      slug: "types:view",
     },
   ],
 
@@ -103,22 +114,24 @@ export function AppSidebar({
   ...props
 }: AppSidebarProps) {
   const effectiveUser = user || null;
+  const isAdmin = permissions.includes("admin");
 
   // Filter menu items based on permissions
   const filteredNavOptions = data.navOptions.filter(
-    (item) => !item.slug || permissions.includes(item.slug),
+    (item) => !item.slug || isAdmin || permissions.includes(item.slug),
   );
 
   const filteredNavWebsite = data.navWebsite
     .map((setting) => ({
       ...setting,
       items: setting.items?.filter(
-        (item) => !item.slug || permissions.includes(item.slug),
+        (item) => !item.slug || isAdmin || permissions.includes(item.slug),
       ),
     }))
     .filter(
       (setting) =>
         !setting.slug ||
+        isAdmin ||
         permissions.includes(setting.slug) ||
         (setting.items && setting.items.length > 0),
     );
@@ -127,12 +140,13 @@ export function AppSidebar({
     .map((setting) => ({
       ...setting,
       items: setting.items?.filter(
-        (item) => !item.slug || permissions.includes(item.slug),
+        (item) => !item.slug || isAdmin || permissions.includes(item.slug),
       ),
     }))
     .filter(
       (setting) =>
         !setting.slug ||
+        isAdmin ||
         permissions.includes(setting.slug) ||
         (setting.items && setting.items.length > 0),
     );
