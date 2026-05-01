@@ -39,13 +39,13 @@ async function requireAdmin(permission: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { error: "Usuario nao autenticado.", user: null, admin: null };
+  if (!user) return { error: "Usuário não autenticado.", user: null, admin: null };
 
   const allowed = await checkPermission(permission);
-  if (!allowed) return { error: "Voce nao tem permissao para executar esta acao.", user: null, admin: null };
+  if (!allowed) return { error: "Você não tem permissão para executar esta ação.", user: null, admin: null };
 
   const { supabase: admin, error } = await createAdminClient();
-  if (error || !admin) return { error: "Cliente administrativo do Supabase nao configurado.", user: null, admin: null };
+  if (error || !admin) return { error: "Cliente administrativo do Supabase não configurado.", user: null, admin: null };
 
   return { error: null, user, admin };
 }
@@ -69,7 +69,7 @@ export async function listVehicleDocumentsAction(vehicleId: number): Promise<Act
 
 export async function uploadVehicleDocumentAction(formData: FormData): Promise<ActionResult<VehicleDocument>> {
   const auth = await requireAdmin("documents:create");
-  if (auth.error || !auth.user || !auth.admin) return { success: false, error: auth.error ?? "Nao autorizado." };
+  if (auth.error || !auth.user || !auth.admin) return { success: false, error: auth.error ?? "Não autorizado." };
 
   const vehicleId = Number(formData.get("vehicle_id"));
   const categoryIdRaw = formData.get("category_id")?.toString();
@@ -79,7 +79,7 @@ export async function uploadVehicleDocumentAction(formData: FormData): Promise<A
   const file = formData.get("file");
 
   if (!vehicleId || !title || !(file instanceof File)) {
-    return { success: false, error: "Preencha veiculo, titulo e arquivo." };
+    return { success: false, error: "Preencha veículo, título e arquivo." };
   }
 
   const safeName = sanitizeFileName(file.name);
@@ -134,7 +134,7 @@ export async function updateVehicleDocumentAction(
   },
 ) {
   const auth = await requireAdmin("documents:update");
-  if (auth.error || !auth.user || !auth.admin) return { success: false, error: auth.error ?? "Nao autorizado." };
+  if (auth.error || !auth.user || !auth.admin) return { success: false, error: auth.error ?? "Não autorizado." };
 
   const { error } = await auth.admin
     .from("vehicle_documents")
@@ -156,7 +156,7 @@ export async function updateVehicleDocumentAction(
 
 export async function deleteVehicleDocumentAction(id: number) {
   const auth = await requireAdmin("documents:delete");
-  if (auth.error || !auth.user || !auth.admin) return { success: false, error: auth.error ?? "Nao autorizado." };
+  if (auth.error || !auth.user || !auth.admin) return { success: false, error: auth.error ?? "Não autorizado." };
 
   const { data: document, error: fetchError } = await auth.admin
     .from("vehicle_documents")
@@ -190,7 +190,7 @@ export async function deleteVehicleDocumentAction(id: number) {
 
 export async function getVehicleDocumentUrlAction(id: number): Promise<ActionResult<string>> {
   const auth = await requireAdmin("documents:view");
-  if (auth.error || !auth.admin) return { success: false, error: auth.error ?? "Nao autorizado." };
+  if (auth.error || !auth.admin) return { success: false, error: auth.error ?? "Não autorizado." };
 
   const { data: document, error } = await auth.admin
     .from("vehicle_documents")

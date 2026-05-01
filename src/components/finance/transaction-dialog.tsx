@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import {
   CalendarClock,
   CreditCard,
   FileText,
   Loader2,
+  Paperclip,
   ReceiptText,
   UserRound,
   WalletCards,
   Save,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createTransactionAction } from "@/actions/transactions";
@@ -42,10 +44,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { formatFileSize } from "@/lib/documents";
 import {
   type TransactionFormValues,
 } from "@/lib/transactions";
 import { bankAccountTypeLabel, type BankAccount, type DynamicPaymentMethod, type TransactionCategory } from "@/lib/type-catalog";
+import { formatCurrency } from "@/lib/utils";
 
 type VehicleOption = {
   id: string;
@@ -77,6 +81,8 @@ export function TransactionDialog({
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<DynamicPaymentMethod[]>([]);
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<TransactionFormValues>({
     defaultValues: {
@@ -122,6 +128,13 @@ export function TransactionDialog({
       valor_liquido: "",
       pendente: false,
     });
+    const timeout = setTimeout(() => {
+      setAttachment(null);
+      if (attachmentInputRef.current) {
+        attachmentInputRef.current.value = "";
+      }
+    }, 0);
+    return () => clearTimeout(timeout);
   }, [form, open, vehicle?.id]);
 
   useEffect(() => {
@@ -153,14 +166,24 @@ export function TransactionDialog({
   }, [form, open]);
 
   function onSubmit(values: TransactionFormValues) {
+    const formData = new FormData();
+
+    Object.entries(values).forEach(([key, value]) => {
+      formData.set(key, value == null ? "" : String(value));
+    });
+
+    if (attachment) {
+      formData.set("attachment", attachment);
+    }
+
     startTransition(async () => {
-      const result = await createTransactionAction(values);
+      const result = await createTransactionAction(formData);
       if (result.success) {
-        toast.success("Transacao lancada com sucesso");
+        toast.success("Transação lançada com sucesso");
         onSuccess();
         onOpenChange(false);
       } else {
-        toast.error(result.error ?? "Erro ao criar transacao");
+        toast.error(result.error ?? "Erro ao criar transação");
       }
     });
   }
@@ -186,10 +209,10 @@ export function TransactionDialog({
             </div>
             <div>
               <DialogTitle className="text-2xl font-bold tracking-tight">
-                Nova transacao
+                Nova transação
               </DialogTitle>
               <DialogDescription className="mt-1 text-sm text-muted-foreground">
-                Lance uma receita ou despesa vinculada ao caixa, a uma venda ou a um veiculo.
+                Lance uma receita ou despesa vinculada ao caixa, a uma venda ou a um veículo.
               </DialogDescription>
             </div>
           </div>
@@ -198,7 +221,7 @@ export function TransactionDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
             <ScrollArea className="flex-1 overflow-y-auto bg-muted-foreground/5">
-              <div className="grid grid-cols-1 gap-6 p-8 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 p-8 md:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="tipo"
@@ -208,7 +231,7 @@ export function TransactionDialog({
                       <Select value={field.value} onValueChange={field.onChange} disabled={isPending}>
                         <FormControl>
                           <SelectTrigger className="w-full">
-                            <span className="truncate text-left">{selectedTypeLabel || "Selecione"}</span>
+                            <span className="truncate w-full text-left">{selectedTypeLabel || "Selecione"}</span>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent alignItemWithTrigger={false}>
@@ -226,7 +249,7 @@ export function TransactionDialog({
                   name="payment_method_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Metodo de pagamento</FormLabel>
+                      <FormLabel>Método de pagamento</FormLabel>
                       <Select
                         value={field.value || ""}
                         onValueChange={(value) => {
@@ -239,7 +262,7 @@ export function TransactionDialog({
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <CreditCard className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span className="truncate text-left">
+                            <span className="truncate w-full text-left">
                               {selectedPayment?.nome || "Selecione"}
                             </span>
                           </SelectTrigger>
@@ -247,7 +270,7 @@ export function TransactionDialog({
                         <SelectContent alignItemWithTrigger={false}>
                           {paymentMethods.length === 0 ? (
                             <SelectItem value="__empty" disabled>
-                              Cadastre um metodo em Tipos
+                              Cadastre um método em Tipos
                             </SelectItem>
                           ) : (
                             paymentMethods.map((method) => (
@@ -268,7 +291,7 @@ export function TransactionDialog({
                   name="pendente"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Lancamento futuro</FormLabel>
+                      <FormLabel>Lançamento futuro</FormLabel>
                       <div className="flex h-10 items-center">
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isPending} />
@@ -288,7 +311,26 @@ export function TransactionDialog({
                       <FormControl>
                         <div className="relative">
                           <WalletCards className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input className="pl-9" placeholder="R$ 0,00" required disabled={isPending} {...field} />
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            className="pl-9"
+                            placeholder="R$ 0,00"
+                            required
+                            disabled={isPending}
+                            value={field.value || ""}
+                            onChange={(event) => {
+                              const numericValue = event.target.value.replace(/\D/g, "");
+                              if (numericValue) {
+                                field.onChange(formatCurrency(Number(numericValue) / 100));
+                              } else {
+                                field.onChange("");
+                              }
+                            }}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -360,7 +402,7 @@ export function TransactionDialog({
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span className="truncate text-left">
+                            <span className="truncate w-full text-left">
                               {selectedCategory?.nome || "Selecione"}
                             </span>
                           </SelectTrigger>
@@ -382,12 +424,12 @@ export function TransactionDialog({
                   control={form.control}
                   name="descricao"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Descricao*</FormLabel>
+                    <FormItem className="md:col-span-3">
+                      <FormLabel>Descrição*</FormLabel>
                       <FormControl>
                         <Textarea
                           className="min-h-24 resize-none"
-                          placeholder="Descricao"
+                          placeholder="Descrição"
                           required
                           disabled={isPending}
                           {...field}
@@ -398,7 +440,7 @@ export function TransactionDialog({
                   )}
                 />
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-3 ">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex flex-1 items-center gap-3">
                       <span className="text-sm text-muted-foreground">Dados do pagador</span>
@@ -438,6 +480,83 @@ export function TransactionDialog({
                   )}
                 />
 
+                <div className="md:col-span-3">
+                  <FormLabel>Comprovante</FormLabel>
+                  <div className="mt-2 rounded-xl border border-dashed bg-background p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                          <Paperclip className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {attachment ? attachment.name : "PDF ou imagem do comprovante"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {attachment ? formatFileSize(attachment.size) : "PDF, JPG, PNG ou WebP até 50MB"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {attachment && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setAttachment(null);
+                              if (attachmentInputRef.current) {
+                                attachmentInputRef.current.value = "";
+                              }
+                            }}
+                            disabled={isPending}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => attachmentInputRef.current?.click()}
+                          disabled={isPending}
+                        >
+                          Selecionar arquivo
+                        </Button>
+                      </div>
+                    </div>
+                    <Input
+                      ref={attachmentInputRef}
+                      type="file"
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        if (!file) {
+                          setAttachment(null);
+                          return;
+                        }
+
+                        if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+                          toast.error("Anexe apenas PDF ou imagem JPG, PNG ou WebP.");
+                          event.target.value = "";
+                          setAttachment(null);
+                          return;
+                        }
+
+                        if (file.size > 50 * 1024 * 1024) {
+                          toast.error("O comprovante deve ter até 50MB.");
+                          event.target.value = "";
+                          setAttachment(null);
+                          return;
+                        }
+
+                        setAttachment(file);
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <input type="hidden" {...form.register("vehicle_id")} />
                 <input type="hidden" {...form.register("venda_id")} />
                 <input type="hidden" {...form.register("valor_liquido")} />
@@ -451,7 +570,7 @@ export function TransactionDialog({
                 </Button>
                 <Button type="submit" className="rounded-xl px-8 shadow-lg shadow-primary/20" disabled={isPending}>
                   {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Salvar transacao
+                  Salvar transação
                 </Button>
               </div>
             </DialogFooter>

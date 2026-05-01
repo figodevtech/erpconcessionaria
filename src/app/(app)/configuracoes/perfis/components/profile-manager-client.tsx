@@ -17,7 +17,6 @@ import {
   Edit,
   Loader2,
   ShieldCheck,
-  Lock,
   Trash2,
   AlertTriangle,
   CheckCircle2,
@@ -109,7 +108,7 @@ export function ProfileManagerClient({
       } else {
         toast.error(result.error);
       }
-    } catch (e) {
+    } catch {
       toast.error("Erro inesperado ao excluir perfil");
     } finally {
       setIsDeleting(false);
@@ -253,6 +252,19 @@ export function ProfileManagerClient({
                     (p: { permission_slug: string }) => p.permission_slug,
                   ) || []
                 }
+                onPermissionsChanged={(permissionSlugs) => {
+                  setEditingProfile((current) =>
+                    current
+                      ? {
+                        ...current,
+                        role_permissions: permissionSlugs.map((permission_slug) => ({
+                          permission_slug,
+                        })),
+                      }
+                      : current,
+                  );
+                  onSuccess();
+                }}
               />
             )}
           </div>

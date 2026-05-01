@@ -6,11 +6,14 @@ import { checkPermission } from "@/utils/permissions";
 import type {
   PaymentMethod,
   Transaction,
+  TransactionAttachment,
   TransactionFilters,
   TransactionFormValues,
   TransactionKpis,
   TransactionType,
 } from "@/lib/transactions";
+
+const ATTACHMENTS_BUCKET = "transaction-attachments";
 
 type ActionResult<T> = {
   success: boolean;
@@ -35,11 +38,25 @@ function nullableNumber(value?: string | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function mapTransaction(row: Record<string, unknown>): Transaction {
+function mapAttachment(row: Record<string, unknown>): TransactionAttachment {
   return {
-    ...(row as Omit<Transaction, "valor" | "valor_liquido">),
+    ...(row as Omit<TransactionAttachment, "file_size">),
+    file_size: row.file_size == null ? null : Number(row.file_size),
+  };
+}
+
+function mapTransaction(row: Record<string, unknown>): Transaction {
+  const attachments = Array.isArray(row.attachments)
+    ? (row.attachments as Record<string, unknown>[])
+        .filter((attachment) => attachment.is_deleted !== true)
+        .map(mapAttachment)
+    : [];
+
+  return {
+    ...(row as Omit<Transaction, "valor" | "valor_liquido" | "attachments">),
     valor: Number(row.valor ?? 0),
     valor_liquido: row.valor_liquido == null ? null : Number(row.valor_liquido),
+    attachments,
   };
 }
 
@@ -61,7 +78,44 @@ function toPaymentMethodCode(value?: string | null): PaymentMethod {
 }
 
 function getTransactionSelect() {
-  return "*, vehicle:vehicles(id, brand, model, plate), category:transaction_categories(id, nome), bank_account:bank_accounts(id, titulo), payment_method:payment_methods(id, nome, codigo)";
+  return "*, vehicle:vehicles(id, brand, model, plate), category:transaction_categories(id, nome), bank_account:bank_accounts(id, titulo), payment_method:payment_methods(id, nome, codigo), attachments:transaction_attachments(*)";
+}
+
+function sanitizeFileName(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .toLowerCase();
+}
+
+function formDataToTransactionValues(formData: FormData): TransactionFormValues {
+  const get = (key: keyof TransactionFormValues) => formData.get(key)?.toString() ?? "";
+
+  return {
+    descricao: get("descricao"),
+    valor: get("valor"),
+    data: get("data"),
+    metodo_pagamento: get("metodo_pagamento") as PaymentMethod,
+    categoria: get("categoria"),
+    tipo: get("tipo") as TransactionType,
+    vehicle_id: get("vehicle_id"),
+    venda_id: get("venda_id"),
+    categoria_id: get("categoria_id"),
+    banco_id: get("banco_id"),
+    payment_method_id: get("payment_method_id"),
+    nome_pagador: get("nome_pagador"),
+    cpf_cnpj_pagador: get("cpf_cnpj_pagador"),
+    valor_liquido: get("valor_liquido"),
+    pendente: formData.get("pendente") === "true",
+  };
+}
+
+function getAttachment(values: TransactionFormValues | FormData) {
+  if (!(values instanceof FormData)) return null;
+  const file = values.get("attachment");
+  return file instanceof File && file.size > 0 ? file : null;
 }
 
 export async function listTransactionsAction(
@@ -145,23 +199,25 @@ export async function getTransactionKpisAction(
 }
 
 export async function createTransactionAction(
-  values: TransactionFormValues,
+  input: TransactionFormValues | FormData,
 ): Promise<ActionResult<Transaction>> {
+  const values = input instanceof FormData ? formDataToTransactionValues(input) : input;
+  const attachment = getAttachment(input);
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { success: false, error: "Usuario nao autenticado." };
+  if (!user) return { success: false, error: "Usuário não autenticado." };
 
   const canCreate = await checkPermission("finance:create");
   if (!canCreate) {
-    return { success: false, error: "Voce nao tem permissao para criar transacoes." };
+    return { success: false, error: "Você não tem permissão para criar transações." };
   }
 
   const { supabase: admin, error: adminError } = await createAdminClient();
   if (adminError || !admin) {
-    return { success: false, error: "Cliente administrativo do Supabase nao configurado." };
+    return { success: false, error: "Cliente administrativo do Supabase não configurado." };
   }
 
   const valor = parseMoney(values.valor);
@@ -221,10 +277,65 @@ export async function createTransactionAction(
 
   if (error) return { success: false, error: error.message };
 
+  let transaction = mapTransaction(data as unknown as Record<string, unknown>);
+
+  if (attachment) {
+    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(attachment.type)) {
+      await admin.from("transactions").delete().eq("id", transaction.id);
+      return { success: false, error: "Anexe apenas PDF ou imagem JPG, PNG ou WebP." };
+    }
+
+    const safeName = sanitizeFileName(attachment.name);
+    const filePath = `${transaction.id}/${Date.now()}-${safeName}`;
+    const buffer = Buffer.from(await attachment.arrayBuffer());
+
+    const { error: uploadError } = await admin.storage
+      .from(ATTACHMENTS_BUCKET)
+      .upload(filePath, buffer, {
+        contentType: attachment.type || "application/octet-stream",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      await admin.from("transactions").delete().eq("id", transaction.id);
+      return { success: false, error: uploadError.message };
+    }
+
+    const { data: signed } = await admin.storage
+      .from(ATTACHMENTS_BUCKET)
+      .createSignedUrl(filePath, 60 * 60);
+
+    const { data: attachmentData, error: attachmentError } = await admin
+      .from("transaction_attachments")
+      .insert({
+        transaction_id: transaction.id,
+        file_name: attachment.name,
+        file_path: filePath,
+        file_url: signed?.signedUrl || filePath,
+        file_size: attachment.size,
+        mime_type: attachment.type || null,
+        created_by: user.id,
+        updated_by: user.id,
+      })
+      .select("*")
+      .single();
+
+    if (attachmentError) {
+      await admin.storage.from(ATTACHMENTS_BUCKET).remove([filePath]);
+      await admin.from("transactions").delete().eq("id", transaction.id);
+      return { success: false, error: attachmentError.message };
+    }
+
+    transaction = {
+      ...transaction,
+      attachments: [mapAttachment(attachmentData as unknown as Record<string, unknown>)],
+    };
+  }
+
   revalidatePath("/financeiro");
   revalidatePath("/veiculos");
 
-  return { success: true, data: mapTransaction(data as unknown as Record<string, unknown>) };
+  return { success: true, data: transaction };
 }
 
 export async function softDeleteTransactionAction(id: number) {
@@ -233,16 +344,16 @@ export async function softDeleteTransactionAction(id: number) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { success: false, error: "Usuario nao autenticado." };
+  if (!user) return { success: false, error: "Usuário não autenticado." };
 
   const canDelete = await checkPermission("finance:delete");
   if (!canDelete) {
-    return { success: false, error: "Voce nao tem permissao para excluir transacoes." };
+    return { success: false, error: "Você não tem permissão para excluir transações." };
   }
 
   const { supabase: admin, error: adminError } = await createAdminClient();
   if (adminError || !admin) {
-    return { success: false, error: "Cliente administrativo do Supabase nao configurado." };
+    return { success: false, error: "Cliente administrativo do Supabase não configurado." };
   }
 
   const { error } = await admin
@@ -258,7 +369,66 @@ export async function softDeleteTransactionAction(id: number) {
 
   if (error) return { success: false, error: error.message };
 
+  const { data: attachments } = await admin
+    .from("transaction_attachments")
+    .select("file_path")
+    .eq("transaction_id", id)
+    .eq("is_deleted", false);
+
+  const paths = (attachments ?? [])
+    .map((attachment) => attachment.file_path)
+    .filter(Boolean);
+
+  if (paths.length > 0) {
+    await admin.storage.from(ATTACHMENTS_BUCKET).remove(paths);
+    await admin
+      .from("transaction_attachments")
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        deleted_by: user.id,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("transaction_id", id);
+  }
+
   revalidatePath("/financeiro");
   revalidatePath("/veiculos");
   return { success: true };
+}
+
+export async function getTransactionAttachmentUrlAction(id: number): Promise<ActionResult<string>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { success: false, error: "Usuário não autenticado." };
+
+  const canView = await checkPermission("finance:view");
+  if (!canView) {
+    return { success: false, error: "Você não tem permissão para visualizar anexos financeiros." };
+  }
+
+  const { supabase: admin, error: adminError } = await createAdminClient();
+  if (adminError || !admin) {
+    return { success: false, error: "Cliente administrativo do Supabase não configurado." };
+  }
+
+  const { data: attachment, error } = await admin
+    .from("transaction_attachments")
+    .select("file_path")
+    .eq("id", id)
+    .eq("is_deleted", false)
+    .single();
+
+  if (error) return { success: false, error: error.message };
+
+  const { data, error: signedError } = await admin.storage
+    .from(ATTACHMENTS_BUCKET)
+    .createSignedUrl(attachment.file_path, 60 * 10);
+
+  if (signedError) return { success: false, error: signedError.message };
+  return { success: true, data: data.signedUrl };
 }

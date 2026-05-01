@@ -12,9 +12,9 @@ interface Permission {
   action: string
 }
 
-import { LayoutDashboard, DollarSign, Settings, Users, Car, Shield, Lock } from "lucide-react"
+import { LayoutDashboard, DollarSign, Settings, Users, Car, Shield, type LucideIcon } from "lucide-react"
 
-const MODULE_ICONS: Record<string, any> = {
+const MODULE_ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
   finance: DollarSign,
   financeiro: DollarSign,
@@ -22,6 +22,8 @@ const MODULE_ICONS: Record<string, any> = {
   configuracoes: Settings,
   users: Users,
   usuarios: Users,
+  customers: Users,
+  clientes: Users,
   vehicles: Car,
   veiculos: Car,
 }
@@ -29,11 +31,13 @@ const MODULE_ICONS: Record<string, any> = {
 export function ProfilePermissionsMatrix({
   perfilName,
   allPermissions,
-  initialPermissionSlugs
+  initialPermissionSlugs,
+  onPermissionsChanged,
 }: {
   perfilName: string,
   allPermissions: Permission[],
-  initialPermissionSlugs: string[]
+  initialPermissionSlugs: string[],
+  onPermissionsChanged?: (permissionSlugs: string[]) => void
 }) {
   const [isPending, startTransition] = useTransition()
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>(initialPermissionSlugs)
@@ -57,6 +61,7 @@ export function ProfilePermissionsMatrix({
     startTransition(async () => {
       const result = await updateRolePermissionsAction(perfilName, newSelectedSlugs)
       if (result.success) {
+        onPermissionsChanged?.(newSelectedSlugs)
         toast.success("Permissões atualizadas")
       } else {
         setSelectedSlugs(previousSlugs)
@@ -79,6 +84,7 @@ export function ProfilePermissionsMatrix({
               </div>
               <h3 className="font-bold text-xs uppercase tracking-tighter text-muted-foreground">
                 {module === 'veiculos' ? 'Veículos' :
+                  module === 'customers' || module === 'clientes' ? 'Clientes' :
                   module === 'usuarios' ? 'Usuários' :
                     module === 'configuracoes' ? 'Configurações' :
                       capitalize(module)}

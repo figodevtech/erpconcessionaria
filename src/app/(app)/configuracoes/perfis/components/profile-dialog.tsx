@@ -45,6 +45,8 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   configuracoes: Settings,
   users: Users,
   usuarios: Users,
+  customers: Users,
+  clientes: Users,
   vehicles: Car,
   veiculos: Car,
 }
@@ -105,13 +107,20 @@ export function ProfileDialog({
         } else {
           toast.error("Erro: " + result.error)
         }
-      } catch (e) {
+      } catch {
         toast.error("Erro inesperado ao criar perfil");
       }
     })
   }
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  const moduleLabel = (module: string) => {
+    if (module === "customers" || module === "clientes") return "Clientes";
+    if (module === "veiculos") return "Veículos";
+    if (module === "usuarios") return "Usuários";
+    if (module === "configuracoes") return "Configurações";
+    return capitalize(module);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,7 +197,7 @@ export function ProfileDialog({
                           <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b">
                             <Icon className="h-3.5 w-3.5 text-primary" />
                             <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                              {capitalize(module)}
+                              {moduleLabel(module)}
                             </h4>
                           </div>
                           <div className="p-4 space-y-4">

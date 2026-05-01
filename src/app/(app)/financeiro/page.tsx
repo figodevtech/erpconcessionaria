@@ -107,7 +107,7 @@ export default function CashFlowPage() {
                     setSearch(event.target.value);
                     setPage(1);
                   }}
-                  placeholder="Buscar descricao, categoria..."
+                  placeholder="Buscar descrição, categoria..."
                   className="pl-9"
                 />
               </div>
@@ -130,7 +130,7 @@ export default function CashFlowPage() {
               {canCreate && (
                 <Button size="sm" className="rounded-xl" onClick={() => setDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Nova transacao
+                  Nova transação
                 </Button>
               )}
             </div>
@@ -145,14 +145,14 @@ export default function CashFlowPage() {
 
           <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              Pagina {page} de {totalPages}
+              Página {page} de {totalPages}
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
                 Anterior
               </Button>
               <Button variant="outline" size="sm" disabled={page >= totalPages || loading} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
-                Proxima
+                Próxima
               </Button>
             </div>
           </div>

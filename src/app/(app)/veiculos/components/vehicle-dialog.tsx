@@ -154,6 +154,8 @@ export interface VehicleFormValues {
   status: "Em venda" | "Em breve" | "Vendido" | "Rascunho" | "Pagamento";
   featured: boolean;
   plate: string;
+  chassi?: string | null;
+  renavam?: string | null;
 }
 
 interface VehicleDialogProps {
@@ -213,6 +215,8 @@ export function VehicleDialog({
       status: "Rascunho",
       featured: false,
       plate: "",
+      chassi: "",
+      renavam: "",
     },
   });
 
@@ -280,6 +284,8 @@ export function VehicleDialog({
             status: updatedVehicle.status || "Rascunho",
             featured: updatedVehicle.featured || false,
             plate: updatedVehicle.plate || "",
+            chassi: updatedVehicle.chassi || "",
+            renavam: updatedVehicle.renavam || "",
           });
         }
       } catch (error) {
@@ -324,6 +330,8 @@ export function VehicleDialog({
         status: "Rascunho",
         featured: false,
         plate: "",
+        chassi: "",
+        renavam: "",
       });
       setVehicleImages([]);
     }
@@ -469,7 +477,12 @@ export function VehicleDialog({
     try {
       const url = "/api/vehicles";
       const method = isEditing ? "PATCH" : "POST";
-      const body = isEditing ? { ...values, id: vehicle.id } : values;
+      const normalizedValues = {
+        ...values,
+        chassi: values.chassi?.trim() || null,
+        renavam: values.renavam?.trim() || null,
+      };
+      const body = isEditing ? { ...normalizedValues, id: vehicle.id } : normalizedValues;
 
       const response = await fetch(url, {
         method,
@@ -1222,6 +1235,62 @@ function GeneralTab({
                     )}
                     disabled={loading}
                     maxLength={8}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="chassi"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Chassi
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Ex: 9BWZZZ377VT004251"
+                    {...field}
+                    value={field.value || ""}
+                    onChange={(e) => {
+                      const rawValue = e.target.value
+                        .replace(/[^a-zA-Z0-9]/g, "")
+                        .toUpperCase()
+                        .substring(0, 17);
+                      field.onChange(rawValue);
+                    }}
+                    className="uppercase bg-background/50 rounded-lg h-10"
+                    disabled={loading}
+                    maxLength={17}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="renavam"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Renavam
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Ex: 12345678901"
+                    {...field}
+                    value={field.value || ""}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\D/g, "").substring(0, 11);
+                      field.onChange(rawValue);
+                    }}
+                    className="bg-background/50 rounded-lg h-10"
+                    disabled={loading}
+                    inputMode="numeric"
+                    maxLength={11}
                   />
                 </FormControl>
               </FormItem>

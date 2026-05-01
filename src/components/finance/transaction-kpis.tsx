@@ -19,7 +19,7 @@ export function TransactionKpis({ data }: { data: TransactionKpis }) {
       value: formatCurrency(data.totalDespesas),
       icon: ArrowDownCircle,
       className: "text-red-600",
-      hint: "Saidas registradas",
+      hint: "Saídas registradas",
     },
     {
       title: "Saldo",
@@ -33,7 +33,7 @@ export function TransactionKpis({ data }: { data: TransactionKpis }) {
       value: data.pendentes.toString(),
       icon: Clock3,
       className: "text-amber-600",
-      hint: "Lancamentos em aberto",
+      hint: "Lançamentos em aberto",
     },
   ];
 

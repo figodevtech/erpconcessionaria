@@ -39,7 +39,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -114,7 +113,7 @@ export function VehicleAttachmentsTab({ vehicle }: { vehicle: Vehicle }) {
                 <FileText className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-base">Anexos do veiculo</CardTitle>
+                <CardTitle className="text-base">Anexos do veículo</CardTitle>
                 <button
                   type="button"
                   onClick={fetchData}
@@ -143,19 +142,19 @@ export function VehicleAttachmentsTab({ vehicle }: { vehicle: Vehicle }) {
               <Table className="text-xs">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Titulo</TableHead>
+                    <TableHead>Título</TableHead>
                     <TableHead>Categoria</TableHead>
                     <TableHead>Arquivo</TableHead>
                     <TableHead>Validade</TableHead>
                     <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-right">Acoes</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {documents.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        Nenhum anexo cadastrado para este veiculo.
+                        Nenhum anexo cadastrado para este veículo.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -227,18 +226,18 @@ export function VehicleAttachmentsTab({ vehicle }: { vehicle: Vehicle }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir anexo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acao remove o anexo <strong>{deleting?.title}</strong> e apaga o arquivo do bucket.
+              Esta ação remove o anexo <strong>{deleting?.title}</strong> e apaga o arquivo do bucket.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="mr-2">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 if (!deleting) return;
                 const result = await deleteVehicleDocumentAction(deleting.id);
                 if (result.success) {
-                  toast.success("Anexo excluido");
+                  toast.success("Anexo excluído");
                   setDeleting(null);
                   fetchData();
                 } else {
@@ -270,6 +269,7 @@ function DocumentUploadDialog({
 }) {
   const [isPending, startTransition] = useTransition();
   const [categoryId, setCategoryId] = useState("");
+  const selectedCategory = categories.find((category) => category.id.toString() === categoryId);
 
   function submit(formData: FormData) {
     formData.set("vehicle_id", vehicleId.toString());
@@ -291,22 +291,32 @@ function DocumentUploadDialog({
       <DialogContent className="sm:max-w-[720px]">
         <DialogHeader>
           <DialogTitle>Novo anexo</DialogTitle>
-          <DialogDescription>Envie um documento para vincular ao veiculo.</DialogDescription>
+          <DialogDescription>Envie um documento para vincular ao veículo.</DialogDescription>
         </DialogHeader>
-        <form action={submit} className="grid gap-4">
-          <Field label="Titulo"><Input name="title" required /></Field>
+        <form
+          action={submit}
+          className="grid gap-4"
+          onSubmit={(event) => event.stopPropagation()}
+        >
+          <Field label="Título"><Input name="title" required /></Field>
           <Field label="Categoria">
             <Select value={categoryId} onValueChange={(value) => setCategoryId(value ?? "")}>
-              <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
-              <SelectContent alignItemWithTrigger={false}>
+              <SelectTrigger>
+                <span className="truncate text-left">
+                  {selectedCategory?.nome || "Selecione uma categoria"}
+                </span>
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false} className="s">
                 {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id.toString()}>{category.nome}</SelectItem>
+                  <SelectItem key={category.id} value={category.id.toString()} className="pr-10">
+                    <span className="whitespace-normal break-words">{category.nome}</span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
           <Field label="Validade"><Input name="expires_at" type="date" /></Field>
-          <Field label="Descricao"><Textarea name="description" className="resize-none" /></Field>
+          <Field label="Descrição"><Textarea name="description" className="resize-none" /></Field>
           <Field label="Arquivo"><Input name="file" type="file" required /></Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>Cancelar</Button>
@@ -338,6 +348,7 @@ function DocumentEditDialog({
   const [categoryId, setCategoryId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [active, setActive] = useState(true);
+  const selectedCategory = categories.find((category) => category.id.toString() === categoryId);
 
   useEffect(() => {
     if (!document) return;
@@ -375,27 +386,35 @@ function DocumentEditDialog({
       <DialogContent className="sm:max-w-[720px]">
         <DialogHeader>
           <DialogTitle>Editar anexo</DialogTitle>
-          <DialogDescription>Atualize os dados do documento vinculado ao veiculo.</DialogDescription>
+          <DialogDescription>Atualize os dados do documento vinculado ao veículo.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
-          <Field label="Titulo"><Input value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+          <Field label="Título"><Input value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
           <Field label="Categoria">
             <Select value={categoryId || "none"} onValueChange={(value) => setCategoryId(value === "none" || !value ? "" : value)}>
-              <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
-              <SelectContent alignItemWithTrigger={false}>
-                <SelectItem value="none">Sem categoria</SelectItem>
+              <SelectTrigger>
+                <span className="truncate text-left">
+                  {selectedCategory?.nome || "Sem categoria"}
+                </span>
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false} className="w-auto min-w-[260px] max-w-[min(420px,calc(100vw-2rem))]">
+                <SelectItem value="none" className="pr-10">
+                  <span className="whitespace-normal break-words">Sem categoria</span>
+                </SelectItem>
                 {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id.toString()}>{category.nome}</SelectItem>
+                  <SelectItem key={category.id} value={category.id.toString()} className="pr-10">
+                    <span className="whitespace-normal break-words">{category.nome}</span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
           <Field label="Validade"><Input value={expiresAt} type="date" onChange={(event) => setExpiresAt(event.target.value)} /></Field>
-          <Field label="Descricao"><Textarea value={description} onChange={(event) => setDescription(event.target.value)} className="resize-none" /></Field>
+          <Field label="Descrição"><Textarea value={description} onChange={(event) => setDescription(event.target.value)} className="resize-none" /></Field>
           <div className="flex items-center justify-between rounded-xl border p-3">
             <div>
               <Label>Ativo</Label>
-              <p className="text-xs text-muted-foreground">Controla se o anexo fica disponivel nas listagens.</p>
+              <p className="text-xs text-muted-foreground">Controla se o anexo fica disponível nas listagens.</p>
             </div>
             <Switch checked={active} onCheckedChange={setActive} />
           </div>

@@ -54,6 +54,22 @@ export type Transaction = {
     nome: string;
     codigo: PaymentMethod;
   } | null;
+  attachments?: TransactionAttachment[];
+};
+
+export type TransactionAttachment = {
+  id: number;
+  transaction_id: number;
+  file_name: string;
+  file_path: string;
+  file_url: string;
+  file_size: number | null;
+  mime_type: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  is_deleted: boolean;
 };
 
 export type TransactionFormValues = {

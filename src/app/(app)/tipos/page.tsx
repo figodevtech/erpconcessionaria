@@ -137,7 +137,7 @@ export default function TypesPage() {
         <TypeSummaryCard title="Categorias" value={categories.length} icon={Tags} />
         <TypeSummaryCard title="Documentos" value={documentCategories.length} icon={Files} />
         <TypeSummaryCard title="Bancos" value={bankAccounts.length} icon={Building2} />
-        <TypeSummaryCard title="Metodos" value={paymentMethods.length} icon={CreditCard} />
+        <TypeSummaryCard title="Métodos" value={paymentMethods.length} icon={CreditCard} />
       </div>
 
       <Card>
@@ -175,12 +175,12 @@ export default function TypesPage() {
                 <TabsTrigger value="categories" className="px-4">Categorias</TabsTrigger>
                 <TabsTrigger value="documents" className="px-4">Documentos</TabsTrigger>
                 <TabsTrigger value="banks" className="px-4">Bancos</TabsTrigger>
-                <TabsTrigger value="payments" className="px-4">Metodos</TabsTrigger>
+                <TabsTrigger value="payments" className="px-4">Métodos</TabsTrigger>
               </TabsList>
 
               <TabsContent value="categories">
                 <TypeSectionHeader
-                  title="Categorias de transacao"
+                  title="Categorias de transação"
                   description="Classifique receitas e despesas do fluxo de caixa."
                   buttonLabel="Nova categoria"
                   onClick={() => {
@@ -204,7 +204,7 @@ export default function TypesPage() {
               <TabsContent value="documents">
                 <TypeSectionHeader
                   title="Categorias de documentos"
-                  description="Classifique anexos e documentos vinculados aos veiculos."
+                  description="Classifique anexos e documentos vinculados aos veículos."
                   buttonLabel="Nova categoria"
                   onClick={() => {
                     setEditTarget(null);
@@ -249,9 +249,9 @@ export default function TypesPage() {
 
               <TabsContent value="payments">
                 <TypeSectionHeader
-                  title="Metodos de pagamento"
-                  description="Defina as opcoes disponiveis nos lancamentos financeiros."
-                  buttonLabel="Novo metodo"
+                  title="Métodos de pagamento"
+                  description="Defina as opções disponíveis nos lançamentos financeiros."
+                  buttonLabel="Novo método"
                   onClick={() => {
                     setEditTarget(null);
                     setDialogMode("payment");
@@ -449,13 +449,13 @@ function BankAccountsTable({
       <Table className="text-xs">
         <TableHeader>
           <TableRow>
-            <TableHead>Titulo</TableHead>
+            <TableHead>Título</TableHead>
             <TableHead>Tipo</TableHead>
             <TableHead>Agencia / Conta</TableHead>
             <TableHead>Proprietario</TableHead>
             <TableHead className="text-right">Valor inicial</TableHead>
             <TableHead className="text-center">Status</TableHead>
-            <TableHead className="text-right">Acoes</TableHead>
+            <TableHead className="text-right">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -539,10 +539,10 @@ function TypeTableShell({ children, empty }: { children: ReactNode; empty: boole
         <TableHeader>
           <TableRow>
             <TableHead>Nome</TableHead>
-            <TableHead>Descricao / Codigo</TableHead>
+            <TableHead>Descrição / Código</TableHead>
             <TableHead>Detalhe</TableHead>
             <TableHead className="text-center">Status</TableHead>
-            <TableHead className="text-right">Acoes</TableHead>
+            <TableHead className="text-right">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -609,13 +609,13 @@ function RowActions({
     startTransition(async () => {
       const result = await onDelete();
       if (result.success) {
-        toast.success("Cadastro excluido");
+        toast.success("Cadastro excluído");
         setConfirmOpen(false);
         onChanged();
       } else {
         toast.error(
           result.error?.includes("violates foreign key")
-            ? "Nao foi possivel excluir: este cadastro ja esta em uso."
+            ? "Não foi possível excluir: este cadastro já está em uso."
             : result.error ?? "Erro ao excluir cadastro",
         );
       }
@@ -645,7 +645,7 @@ function RowActions({
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir cadastro?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acao remove o tipo permanentemente. Se ele ja estiver em uso em alguma transacao,
+                Esta ação remove o tipo permanentemente. Se ele já estiver em uso em alguma transação,
                 o banco de dados pode bloquear a exclusao para preservar o historico.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -699,7 +699,7 @@ function TypeCreateDialog({
       ? `${titlePrefix} categoria`
       : mode === "bank"
         ? `${titlePrefix} banco`
-        : `${titlePrefix} metodo`;
+        : `${titlePrefix} método`;
 
   useEffect(() => {
     if (!open) return;
@@ -846,7 +846,7 @@ function TypeCreateDialog({
 
         {mode === "bank" ? (
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Titulo"><Input value={form.titulo} onChange={(event) => update("titulo", event.target.value)} /></Field>
+            <Field label="Título"><Input value={form.titulo} onChange={(event) => update("titulo", event.target.value)} /></Field>
             <Field label="Valor inicial"><Input value={form.valor_inicial} onChange={(event) => update("valor_inicial", event.target.value)} /></Field>
             <Field label="Tipo">
               <Select value={form.tipo} onValueChange={(value) => update("tipo", value as BankAccountType)}>
@@ -865,7 +865,7 @@ function TypeCreateDialog({
           <div className="grid gap-4">
             <Field label="Nome"><Input value={form.nome} onChange={(event) => update("nome", event.target.value)} /></Field>
             {mode === "payment" && (
-              <Field label="Codigo fiscal">
+              <Field label="Código fiscal">
                 <Select value={form.codigo} onValueChange={(value) => update("codigo", value as PaymentMethod)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent alignItemWithTrigger={false}>
@@ -874,7 +874,7 @@ function TypeCreateDialog({
                 </Select>
               </Field>
             )}
-            <Field label="Descricao">
+            <Field label="Descrição">
               <Textarea value={form.descricao} onChange={(event) => update("descricao", event.target.value)} className="resize-none" />
             </Field>
             <ActiveField ativo={form.ativo} onChange={(value) => update("ativo", value)} />
@@ -913,7 +913,7 @@ function ActiveField({
     <div className="flex items-center justify-between rounded-xl border bg-muted/20 p-3">
       <div>
         <Label>Ativo</Label>
-        <p className="text-xs text-muted-foreground">Disponivel para uso em novos lancamentos.</p>
+        <p className="text-xs text-muted-foreground">Disponível para uso em novos lançamentos.</p>
       </div>
       <Switch checked={ativo} onCheckedChange={onChange} />
     </div>

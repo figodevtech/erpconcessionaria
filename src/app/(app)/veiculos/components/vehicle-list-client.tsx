@@ -18,6 +18,8 @@ export type VehicleStatus = "Em venda" | "Em breve" | "Vendido" | "Rascunho" | "
 export interface Vehicle {
   id: string;
   plate: string;
+  chassi?: string | null;
+  renavam?: string | null;
   brand: string;
   model: string;
   version: string;

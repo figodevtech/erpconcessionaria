@@ -27,9 +27,9 @@ export async function GET(request: Request) {
       query = query.eq('status', status);
     }
 
-    // Filter by search string (brand, model, plate, color)
+    // Filter by search string (brand, model, plate, chassi, renavam, color)
     if (search) {
-      query = query.or(`brand.ilike.%${search}%,model.ilike.%${search}%,plate.ilike.%${search}%,color.ilike.%${search}%,version.ilike.%${search}%`);
+      query = query.or(`brand.ilike.%${search}%,model.ilike.%${search}%,plate.ilike.%${search}%,chassi.ilike.%${search}%,renavam.ilike.%${search}%,color.ilike.%${search}%,version.ilike.%${search}%`);
     }
 
     // Pagination
