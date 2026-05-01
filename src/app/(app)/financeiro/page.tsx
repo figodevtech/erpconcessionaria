@@ -8,6 +8,7 @@ import { TransactionKpis } from "@/components/finance/transaction-kpis";
 import { TransactionTable } from "@/components/finance/transaction-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { VehiclePagination } from "@/app/(app)/veiculos/components/vehicle-pagination";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -90,7 +91,7 @@ export default function CashFlowPage() {
                 <button
                   onClick={fetchData}
                   disabled={loading}
-                  className="inline-flex items-center gap-1 text-foreground/50 hover:text-foreground/70 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 text-foreground/50 hover:text-foreground/70 hover:cursor-pointer disabled:opacity-50"
                 >
                   <span>Recarregar</span>
                   <Loader2 width={12} className={loading ? "animate-spin" : ""} />
@@ -128,7 +129,7 @@ export default function CashFlowPage() {
                 </SelectContent>
               </Select>
               {canCreate && (
-                <Button size="sm" className="rounded-xl" onClick={() => setDialogOpen(true)}>
+                <Button size="sm" className="rounded-xl shadow-lg" onClick={() => setDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Nova transação
                 </Button>
@@ -143,18 +144,8 @@ export default function CashFlowPage() {
 
           <TransactionTable transactions={transactions} loading={loading} onChanged={fetchData} />
 
-          <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              Página {page} de {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
-                Anterior
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages || loading} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
-                Próxima
-              </Button>
-            </div>
+          <div className="mt-4">
+            <VehiclePagination page={page} totalPages={totalPages} setPage={setPage} />
           </div>
         </CardContent>
       </Card>

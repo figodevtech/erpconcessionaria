@@ -112,128 +112,128 @@ export function VehicleTable({
     <div className="relative min-h-[400px] w-full">
       <ScrollArea className="w-full">
         <div className="min-w-full p-4">
-          <Table className="min-w-[1500px] text-xs">
-        <TableHeader>
-          <TableRow>
-            {showImages && <TableHead>Foto</TableHead>}
-            <TableHead>ID</TableHead>
-            <TableHead>Marca / Modelo</TableHead>
-            <TableHead className="text-center">Ano</TableHead>
-            <TableHead className="text-center">Placa</TableHead>
-            <TableHead className="text-right">Valor Compra</TableHead>
-            <TableHead className="text-right">Receitas</TableHead>
-            <TableHead className="text-right">Despesas</TableHead>
-            <TableHead className="text-right">Valor Venda</TableHead>
-            <TableHead className="text-right">Lucro</TableHead>
-            <TableHead className="text-right">% Lucro</TableHead>
-            <TableHead className="text-center">Status</TableHead>
-            <TableHead className="text-center">Adicionado em</TableHead>
-            <TableHead className="text-center">Acoes</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {vehicles.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={showImages ? 14 : 13}
-                className="h-24 text-center text-muted-foreground"
-              >
-                {loading ? "Carregando veiculos..." : "Nenhum veiculo encontrado para a busca."}
-              </TableCell>
-            </TableRow>
-          ) : (
-            vehicles.map((vehicle) => (
-              <TableRow
-                className="h-14 cursor-pointer"
-                key={vehicle.id}
-                onDoubleClick={() => onEdit(vehicle)}
-              >
-                {showImages && (
-                  <TableCell>
-                    <Image
-                      src={vehicle.image || ""}
-                      alt={vehicle.brand}
-                      width={50}
-                      height={50}
-                      className="rounded-md"
-                    />
-                  </TableCell>
-                )}
-                <TableCell>{vehicle.id}</TableCell>
-                <TableCell className="min-w-[240px] font-medium">
-                  {vehicle.brand} {vehicle.model} {vehicle.version}
-                </TableCell>
-                <TableCell className="text-center">{vehicle.year}</TableCell>
-                <TableCell className="text-center uppercase">
-                  {vehicle.plate || "N/A"}
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(Number(vehicle.purchase_price ?? 0))}
-                </TableCell>
-                <TableCell className="text-right font-medium text-emerald-600">
-                  {formatCurrency(Number(vehicle.total_receitas ?? 0))}
-                </TableCell>
-                <TableCell className="text-right font-medium text-red-600">
-                  {formatCurrency(Number(vehicle.total_despesas ?? 0))}
-                </TableCell>
-                <TableCell className="text-right font-semibold text-primary">
-                  {formatCurrency(vehicle.price)}
-                </TableCell>
-                <TableCell className={`text-right font-semibold ${profitClassName(vehicle.lucro)}`}>
-                  {formatCurrency(Number(vehicle.lucro ?? 0))}
-                </TableCell>
-                <TableCell className={`text-right font-semibold ${profitClassName(vehicle.lucro)}`}>
-                  {formatPercent(vehicle.lucro_percentual)}
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge
-                    variant="outline"
-                    className={`border-transparent font-normal ${getStatusColor(vehicle.status || "")}`}
-                  >
-                    {vehicle.status || "Indefinido"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-center">
-                  {new Date(vehicle.created_at).toLocaleDateString("pt-BR")}
-                </TableCell>
-                <TableCell className="text-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      }
-                    />
-
-                    <DropdownMenuContent align="end" className="text-nowrap">
-                      <DropdownMenuItem
-                        className="hover:cursor-pointer"
-                        onClick={() => onEdit(vehicle)}
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Editar
-                      </DropdownMenuItem>
-
-                      {hasPermission("vehicles:delete") && (
-                        <DropdownMenuItem
-                          className="text-destructive hover:cursor-pointer focus:text-destructive"
-                          onClick={() => setVehicleToDelete(vehicle)}
-                        >
-                          <Trash2Icon className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+          <Table className=" text-xs">
+            <TableHeader>
+              <TableRow>
+                {showImages && <TableHead>Foto</TableHead>}
+                <TableHead>ID</TableHead>
+                <TableHead>Marca / Modelo</TableHead>
+                <TableHead className="text-center">Ano</TableHead>
+                <TableHead className="text-center">Placa</TableHead>
+                <TableHead className="text-right">Valor Compra</TableHead>
+                <TableHead className="text-right">Receitas</TableHead>
+                <TableHead className="text-right">Despesas</TableHead>
+                <TableHead className="text-right">Valor Venda</TableHead>
+                <TableHead className="text-right">Lucro</TableHead>
+                <TableHead className="text-right">% Lucro</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">Adicionado em</TableHead>
+                <TableHead className="text-center">Acoes</TableHead>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      </div>
-      <ScrollBar orientation="horizontal" />
+            </TableHeader>
+            <TableBody>
+              {vehicles.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={showImages ? 14 : 13}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    {loading ? "Carregando veiculos..." : "Nenhum veiculo encontrado para a busca."}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                vehicles.map((vehicle) => (
+                  <TableRow
+                    className="h-14 cursor-pointer"
+                    key={vehicle.id}
+                    onDoubleClick={() => onEdit(vehicle)}
+                  >
+                    {showImages && (
+                      <TableCell>
+                        <Image
+                          src={vehicle.image || ""}
+                          alt={vehicle.brand}
+                          width={50}
+                          height={50}
+                          className="rounded-md"
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>{vehicle.id}</TableCell>
+                    <TableCell className="min-w-[240px] font-medium">
+                      {vehicle.brand} {vehicle.model} {vehicle.version}
+                    </TableCell>
+                    <TableCell className="text-center">{vehicle.year}</TableCell>
+                    <TableCell className="text-center uppercase">
+                      {vehicle.plate || "N/A"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(Number(vehicle.purchase_price ?? 0))}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-emerald-600">
+                      {formatCurrency(Number(vehicle.total_receitas ?? 0))}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-red-600">
+                      {formatCurrency(Number(vehicle.total_despesas ?? 0))}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-primary">
+                      {formatCurrency(vehicle.price)}
+                    </TableCell>
+                    <TableCell className={`text-right font-semibold ${profitClassName(vehicle.lucro)}`}>
+                      {formatCurrency(Number(vehicle.lucro ?? 0))}
+                    </TableCell>
+                    <TableCell className={`text-right font-semibold ${profitClassName(vehicle.lucro)}`}>
+                      {formatPercent(vehicle.lucro_percentual)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant="outline"
+                        className={`border-transparent font-normal ${getStatusColor(vehicle.status || "")}`}
+                      >
+                        {vehicle.status || "Indefinido"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {new Date(vehicle.created_at).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          }
+                        />
+
+                        <DropdownMenuContent align="end" className="text-nowrap">
+                          <DropdownMenuItem
+                            className="hover:cursor-pointer"
+                            onClick={() => onEdit(vehicle)}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+
+                          {hasPermission("vehicles:delete") && (
+                            <DropdownMenuItem
+                              className="text-destructive hover:cursor-pointer focus:text-destructive"
+                              onClick={() => setVehicleToDelete(vehicle)}
+                            >
+                              <Trash2Icon className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
 
       <AlertDialog

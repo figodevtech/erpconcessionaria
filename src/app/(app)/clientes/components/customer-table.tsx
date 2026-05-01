@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   customerPersonTypeLabel,
@@ -67,7 +68,7 @@ export function CustomerTable({
 
   const canUpdate = hasPermission("customers:update");
   const canDelete = hasPermission("customers:delete");
-  const totalPages = Math.ceil(count / pageSize);
+  const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
   function handleDelete() {
     if (!deleteTarget) return;
@@ -86,95 +87,103 @@ export function CustomerTable({
 
   return (
     <div className="space-y-6">
-      <Table className="text-xs">
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-transparent">
-            <TableHead className="w-[72px]">Tipo</TableHead>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Documento</TableHead>
-            <TableHead>Contato</TableHead>
-            <TableHead>Cidade/UF</TableHead>
-            <TableHead className="text-center">Status</TableHead>
-            <TableHead className="text-right">Acoes</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {customers.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                {loading ? "Carregando clientes..." : "Nenhum cliente encontrado."}
-              </TableCell>
-            </TableRow>
-          ) : (
-            customers.map((customer) => (
-              <TableRow
-                key={customer.id}
-                className="h-14 cursor-pointer transition-colors hover:bg-muted/50"
-                onDoubleClick={() => canUpdate && setSelectedCustomer(customer)}
-              >
-                <TableCell>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    {customer.person_type === "PF" ? <UserRound className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
-                  </div>
-                </TableCell>
-                <TableCell className="max-w-[280px]">
-                  <div className="truncate text-sm font-semibold">{customer.name}</div>
-                  <div className="text-[11px] text-muted-foreground">{customer.email}</div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <IdCard className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{formatCpfCnpj(customer.cpf_cnpj)}</span>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">{customerPersonTypeLabel(customer.person_type)}</div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{formatPhone(customer.phone)}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {customer.city}/{customer.state}
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant={customer.status === "ATIVO" ? "secondary" : "outline"} className="font-normal">
-                    {customerStatusLabel(customer.status)}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      }
-                    />
-                    <DropdownMenuContent align="end">
-                      {canUpdate && (
-                        <DropdownMenuItem onClick={() => setSelectedCustomer(customer)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                      )}
-                      {canDelete && (
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setDeleteTarget(customer)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+      <ScrollArea className="w-full">
+        <div className="min-w-full">
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-transparent">
+                <TableHead className="w-[72px]">TIPO</TableHead>
+                <TableHead>CLIENTE</TableHead>
+                <TableHead>DOCUMENTO</TableHead>
+                <TableHead>CONTATO</TableHead>
+                <TableHead>CIDADE/UF</TableHead>
+                <TableHead className="text-center">STATUS</TableHead>
+                <TableHead className="text-right">AÇÕES</TableHead>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            </TableHeader>
+            <TableBody>
+              {customers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    {loading ? "Carregando clientes..." : "Nenhum cliente encontrado."}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                customers.map((customer) => (
+                  <TableRow
+                    key={customer.id}
+                    className="h-14 cursor-pointer transition-colors hover:bg-muted/50"
+                    onDoubleClick={() => canUpdate && setSelectedCustomer(customer)}
+                  >
+                    <TableCell>
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        {customer.person_type === "PF" ? <UserRound className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[280px]">
+                      <div className="truncate text-sm font-semibold">{customer.name}</div>
+                      <div className="text-[11px] text-muted-foreground">{customer.email}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <IdCard className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{formatCpfCnpj(customer.cpf_cnpj)}</span>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">{customerPersonTypeLabel(customer.person_type)}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{formatPhone(customer.phone)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {customer.city}/{customer.state}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant={customer.status === "ATIVO" ? "secondary" : "outline"}
+                        className={`font-normal ${customer.status === "ATIVO" ? "bg-emerald-500/10 text-emerald-500 border-transparent" : ""}`}
+                      >
+                        {customerStatusLabel(customer.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent align="end">
+                          {canUpdate && (
+                            <DropdownMenuItem onClick={() => setSelectedCustomer(customer)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setDeleteTarget(customer)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
 
       {totalPages > 1 && (
         <VehiclePagination page={page} totalPages={totalPages} setPage={setPage} />

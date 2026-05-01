@@ -103,7 +103,7 @@ export default function ClientesPage() {
                 <button
                   onClick={refresh}
                   disabled={loading}
-                  className="inline-flex items-center gap-1 text-foreground/50 hover:text-foreground/70 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 text-foreground/50 hover:text-foreground/70 hover:cursor-pointer disabled:opacity-50"
                 >
                   <span>Recarregar</span>
                   <Loader2 width={12} className={loading ? "animate-spin" : ""} />

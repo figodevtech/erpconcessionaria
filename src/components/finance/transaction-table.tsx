@@ -98,126 +98,130 @@ export function TransactionTable({
   return (
     <div className="w-full">
       <ScrollArea className="w-full">
-        <div className="min-w-full rounded-md border bg-background">
-          <Table className="min-w-[1200px] text-xs">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Descrição</TableHead>
-            {!compact && <TableHead>Veículo</TableHead>}
-            <TableHead>Categoria</TableHead>
-            <TableHead>Método</TableHead>
-            <TableHead className="text-center">Data</TableHead>
-            <TableHead className="text-center">Tipo</TableHead>
-            <TableHead className="text-right">Valor</TableHead>
-            <TableHead className="text-center">Status</TableHead>
-            <TableHead className="text-center">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {transactions.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={compact ? 8 : 9} className="h-24 text-center text-muted-foreground">
-                {loading ? "Carregando transações..." : "Nenhuma transação encontrada."}
-              </TableCell>
-            </TableRow>
-          ) : (
-            transactions.map((transaction) => {
-              const isReceita = transaction.tipo === "RECEITA";
-              const attachment = transaction.attachments?.[0];
-              return (
-                <TableRow key={transaction.id}>
-                  <TableCell className="max-w-[260px] font-medium">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <div className="truncate">{transaction.descricao}</div>
-                      {attachment && (
-                        <Paperclip className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      )}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {transaction.customer?.name || transaction.nome_pagador}
-                    </div>
-                  </TableCell>
-                  {!compact && (
-                    <TableCell>
-                      {transaction.vehicle ? (
-                        <span className="text-nowrap">
-                          {transaction.vehicle.brand} {transaction.vehicle.model}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  )}
-                  <TableCell>{transaction.category?.nome || transaction.categoria}</TableCell>
-                  <TableCell>{transaction.payment_method?.nome || paymentMethodLabel(transaction.metodo_pagamento)}</TableCell>
-                  <TableCell className="text-center">
-                    {new Date(transaction.data).toLocaleDateString("pt-BR")}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant="outline"
-                      className={`border-transparent ${isReceita ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}
-                    >
-                      {isReceita ? (
-                        <ArrowUpCircle className="mr-1 h-3 w-3" />
-                      ) : (
-                        <ArrowDownCircle className="mr-1 h-3 w-3" />
-                      )}
-                      {transactionTypeLabel(transaction.tipo)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className={`text-right font-semibold ${isReceita ? "text-emerald-600" : "text-red-600"}`}>
-                    {isReceita ? "+" : "-"} {formatCurrency(transaction.valor)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant={transaction.pendente ? "outline" : "secondary"} className="font-normal">
-                      {transaction.pendente ? "Pendente" : "Liquidado"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button variant="ghost" size="icon" disabled={isPending && deletingId === transaction.id}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        }
-                      />
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setDetailsTransaction(transaction)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Detalhes
-                        </DropdownMenuItem>
-                        {attachment && (
-                          <DropdownMenuItem
-                            onClick={() => openAttachment(attachment.id)}
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Anexo
-                          </DropdownMenuItem>
-                        )}
-                        {canDelete ? (
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setTransactionToDelete(transaction)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Remover
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem disabled>Sem permissões</DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+        <div className="min-w-full">
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Descrição</TableHead>
+                {!compact && <TableHead>Veículo</TableHead>}
+                <TableHead>Categoria</TableHead>
+                <TableHead>Método</TableHead>
+                <TableHead className="text-center">Data</TableHead>
+                <TableHead className="text-center">Tipo</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={compact ? 8 : 9} className="h-24 text-center text-muted-foreground">
+                    {loading ? "Carregando transações..." : "Nenhuma transação encontrada."}
                   </TableCell>
                 </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
-      </div>
-      <ScrollBar orientation="horizontal" />
+              ) : (
+                transactions.map((transaction) => {
+                  const isReceita = transaction.tipo === "RECEITA";
+                  const attachment = transaction.attachments?.[0];
+                  return (
+                    <TableRow
+                      key={transaction.id}
+                      className="h-14 cursor-pointer transition-colors hover:bg-muted/50"
+                      onDoubleClick={() => setDetailsTransaction(transaction)}
+                    >
+                      <TableCell className="max-w-[260px]">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="truncate text-sm font-semibold">{transaction.descricao}</div>
+                          {attachment && (
+                            <Paperclip className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {transaction.customer?.name || transaction.nome_pagador}
+                        </div>
+                      </TableCell>
+                      {!compact && (
+                        <TableCell>
+                          {transaction.vehicle ? (
+                            <span className="text-nowrap font-medium">
+                              {transaction.vehicle.brand} {transaction.vehicle.model}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      )}
+                      <TableCell>{transaction.category?.nome || transaction.categoria}</TableCell>
+                      <TableCell>{transaction.payment_method?.nome || paymentMethodLabel(transaction.metodo_pagamento)}</TableCell>
+                      <TableCell className="text-center">
+                        {new Date(transaction.data).toLocaleDateString("pt-BR")}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant="outline"
+                          className={`border-transparent font-normal ${isReceita ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}
+                        >
+                          {isReceita ? (
+                            <ArrowUpCircle className="mr-1 h-3 w-3" />
+                          ) : (
+                            <ArrowDownCircle className="mr-1 h-3 w-3" />
+                          )}
+                          {transactionTypeLabel(transaction.tipo)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={`text-right font-semibold ${isReceita ? "text-emerald-500" : "text-red-500"}`}>
+                        {isReceita ? "+" : "-"} {formatCurrency(transaction.valor)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={transaction.pendente ? "outline" : "secondary"} className="font-normal ring-1 ring-white/5">
+                          {transaction.pendente ? "Pendente" : "Liquidado"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isPending && deletingId === transaction.id}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            }
+                          />
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setDetailsTransaction(transaction)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Detalhes
+                            </DropdownMenuItem>
+                            {attachment && (
+                              <DropdownMenuItem
+                                onClick={() => openAttachment(attachment.id)}
+                              >
+                                <Download className="mr-2 h-4 w-4" />
+                                Anexo
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete ? (
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setTransactionToDelete(transaction)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remover
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem disabled>Sem permissões</DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
 
       <TransactionDetailsDialog
