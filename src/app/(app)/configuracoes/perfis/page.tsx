@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from "react";
 import { getRolesAction, getProfileKPIsAction, getPermissionsAction } from "@/actions/roles";
 import { ProfileKPIs } from "./components/profile-kpis";
 import { ProfileManagerClient } from "./components/profile-manager-client";
-import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -45,7 +44,6 @@ export default function ProfilesPage() {
     avgPermissions: number;
     assignedProfiles: number;
   } | null>(null);
-  const [kpiLoading, setKpiLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
 
@@ -60,12 +58,10 @@ export default function ProfilesPage() {
   }, [page, search]);
 
   const fetchKPIs = useCallback(async () => {
-    setKpiLoading(true);
     const result = await getProfileKPIsAction();
     if (result.success) {
       setKpiData(result.data || null);
     }
-    setKpiLoading(false);
   }, []);
 
   const fetchPermissions = useCallback(async () => {
@@ -73,15 +69,17 @@ export default function ProfilesPage() {
     setAllPermissions(data || []);
   }, []);
 
+  const refresh = useCallback(() => {
+    fetchProfiles();
+    fetchKPIs();
+    fetchPermissions();
+  }, [fetchProfiles, fetchKPIs, fetchPermissions]);
+
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      fetchProfiles();
-      fetchKPIs();
-      fetchPermissions();
-    }, 100);
+    const timeout = setTimeout(refresh, 100);
 
     return () => clearTimeout(timeout);
-  }, [fetchProfiles, fetchKPIs, fetchPermissions]);
+  }, [refresh]);
 
   const handleNew = () => {
     setIsCreateDialogOpen(true);
@@ -93,27 +91,16 @@ export default function ProfilesPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <Suspense
-        fallback={
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-          </div>
-        }
-      >
-        {kpiLoading || !kpiData ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-          </div>
-        ) : (
-          <ProfileKPIs data={kpiData} />
-        )}
-      </Suspense>
+      {!kpiData ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+      ) : (
+        <ProfileKPIs data={kpiData} />
+      )}
 
       <ProfileFilters search={search} setSearch={setSearch} setPage={setPage} />
 
@@ -126,7 +113,7 @@ export default function ProfilesPage() {
               </CardTitle>
               <CardDescription className="mt-1">
                 <button
-                  onClick={() => fetchProfiles()}
+                  onClick={refresh}
                   disabled={loading}
                   className="inline-flex items-center gap-1 text-foreground/50 hover:text-foreground/70 hover:cursor-pointer disabled:opacity-50"
                 >

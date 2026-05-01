@@ -47,15 +47,59 @@ export async function GET(request: Request) {
 
     const totalPages = count ? Math.ceil(count / limit) : 0;
 
+    const vehicleIds = (data ?? []).map((vehicle) => vehicle.id).filter(Boolean);
+    const financeByVehicle = new Map<number, { receitas: number; despesas: number }>();
+
+    if (vehicleIds.length > 0) {
+      const { data: transactions, error: transactionsError } = await supabase
+        .from("transactions")
+        .select("vehicle_id, tipo, valor")
+        .in("vehicle_id", vehicleIds)
+        .eq("is_deleted", false);
+
+      if (transactionsError) {
+        console.error("Error fetching vehicle finance totals:", transactionsError);
+      } else {
+        (transactions ?? []).forEach((transaction) => {
+          const vehicleId = Number(transaction.vehicle_id);
+          if (!vehicleId) return;
+
+          const current = financeByVehicle.get(vehicleId) ?? { receitas: 0, despesas: 0 };
+          const value = Number(transaction.valor ?? 0);
+
+          if (transaction.tipo === "RECEITA") {
+            current.receitas += value;
+          }
+
+          if (transaction.tipo === "DESPESA") {
+            current.despesas += value;
+          }
+
+          financeByVehicle.set(vehicleId, current);
+        });
+      }
+    }
+
     // Enforce sort_order for vehicle images since Supabase nested relationship fetches do not guarantee order
     const formattedData = data?.map(vehicle => {
       let sortedImages = vehicle.vehicle_images;
       if (Array.isArray(sortedImages)) {
         sortedImages = [...sortedImages].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
       }
+
+      const finance = financeByVehicle.get(Number(vehicle.id)) ?? { receitas: 0, despesas: 0 };
+      const purchasePrice = Number(vehicle.purchase_price ?? 0);
+      const salePrice = Number(vehicle.price ?? 0);
+      const currentCost = purchasePrice + finance.despesas - finance.receitas;
+      const profit = salePrice - currentCost;
+
       return {
         ...vehicle,
-        vehicle_images: sortedImages
+        vehicle_images: sortedImages,
+        total_receitas: finance.receitas,
+        total_despesas: finance.despesas,
+        lucro: profit,
+        lucro_percentual: currentCost > 0 ? (profit / currentCost) * 100 : 0,
       };
     }) || [];
 

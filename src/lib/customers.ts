@@ -1,10 +1,8 @@
 export const CUSTOMER_PERSON_TYPES = ["PF", "PJ"] as const;
 export const CUSTOMER_STATUSES = ["ATIVO", "INATIVO"] as const;
-export const CUSTOMER_RANKS = ["LEAD", "BRONZE", "PRATA", "OURO", "VIP"] as const;
 
 export type CustomerPersonType = (typeof CUSTOMER_PERSON_TYPES)[number];
 export type CustomerStatus = (typeof CUSTOMER_STATUSES)[number];
-export type CustomerRank = (typeof CUSTOMER_RANKS)[number];
 
 export type Customer = {
   id: number;
@@ -24,9 +22,6 @@ export type Customer = {
   municipal_registration: string | null;
   city_code: string | null;
   status: CustomerStatus;
-  rank: CustomerRank | null;
-  ranked_by: string | null;
-  ranked_at: string | null;
   user_id: string | null;
   created_at: string;
   updated_at: string;
@@ -54,7 +49,6 @@ export type CustomerFormValues = {
   municipal_registration?: string;
   city_code?: string;
   status: CustomerStatus;
-  rank?: CustomerRank | "";
 };
 
 export type CustomerFilters = {
@@ -73,27 +67,55 @@ export type CustomerKpis = {
 };
 
 export function customerPersonTypeLabel(type: CustomerPersonType) {
-  return type === "PF" ? "Pessoa física" : "Pessoa jurídica";
+  return type === "PF" ? "Pessoa fisica" : "Pessoa juridica";
 }
 
 export function customerStatusLabel(status: CustomerStatus) {
   return status === "ATIVO" ? "Ativo" : "Inativo";
 }
 
-export function customerRankLabel(rank?: CustomerRank | null) {
-  if (!rank) return "Sem classificação";
-  const labels: Record<CustomerRank, string> = {
-    LEAD: "Lead",
-    BRONZE: "Bronze",
-    PRATA: "Prata",
-    OURO: "Ouro",
-    VIP: "VIP",
-  };
-  return labels[rank];
-}
-
 export function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
+}
+
+export function isValidCpf(value: string) {
+  const cpf = onlyDigits(value);
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+
+  const calculateDigit = (base: string, factor: number) => {
+    const total = base
+      .split("")
+      .reduce((sum, digit) => sum + Number(digit) * factor--, 0);
+    const remainder = (total * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  const firstDigit = calculateDigit(cpf.slice(0, 9), 10);
+  const secondDigit = calculateDigit(cpf.slice(0, 10), 11);
+
+  return firstDigit === Number(cpf[9]) && secondDigit === Number(cpf[10]);
+}
+
+export function isValidCnpj(value: string) {
+  const cnpj = onlyDigits(value);
+  if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false;
+
+  const calculateDigit = (base: string, weights: number[]) => {
+    const total = base
+      .split("")
+      .reduce((sum, digit, index) => sum + Number(digit) * weights[index], 0);
+    const remainder = total % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const firstDigit = calculateDigit(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const secondDigit = calculateDigit(cnpj.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+
+  return firstDigit === Number(cnpj[12]) && secondDigit === Number(cnpj[13]);
+}
+
+export function isValidCustomerDocument(type: CustomerPersonType, value: string) {
+  return type === "PF" ? isValidCpf(value) : isValidCnpj(value);
 }
 
 export function formatCpfCnpj(value: string) {

@@ -33,7 +33,6 @@ import {
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   customerPersonTypeLabel,
-  customerRankLabel,
   customerStatusLabel,
   formatCpfCnpj,
   formatPhone,
@@ -76,7 +75,7 @@ export function CustomerTable({
     startTransition(async () => {
       const result = await deleteCustomerAction(deleteTarget.id);
       if (result.success) {
-        toast.success("Cliente excluído");
+        toast.success("Cliente excluido");
         setDeleteTarget(null);
         onSuccess();
       } else {
@@ -96,14 +95,13 @@ export function CustomerTable({
             <TableHead>Contato</TableHead>
             <TableHead>Cidade/UF</TableHead>
             <TableHead className="text-center">Status</TableHead>
-            <TableHead className="text-center">Classificação</TableHead>
-            <TableHead className="text-right">Ações</TableHead>
+            <TableHead className="text-right">Acoes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {customers.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                 {loading ? "Carregando clientes..." : "Nenhum cliente encontrado."}
               </TableCell>
             </TableRow>
@@ -142,11 +140,6 @@ export function CustomerTable({
                 <TableCell className="text-center">
                   <Badge variant={customer.status === "ATIVO" ? "secondary" : "outline"} className="font-normal">
                     {customerStatusLabel(customer.status)}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant="outline" className="font-normal">
-                    {customerRankLabel(customer.rank)}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -199,7 +192,7 @@ export function CustomerTable({
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir cliente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação remove <strong>{deleteTarget?.name}</strong> da lista de clientes ativos. O cadastro será preservado como excluído.
+              Esta acao remove <strong>{deleteTarget?.name}</strong> da lista de clientes ativos. O cadastro sera preservado como excluido.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

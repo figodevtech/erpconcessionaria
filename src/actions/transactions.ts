@@ -78,7 +78,7 @@ function toPaymentMethodCode(value?: string | null): PaymentMethod {
 }
 
 function getTransactionSelect() {
-  return "*, vehicle:vehicles(id, brand, model, plate), category:transaction_categories(id, nome), bank_account:bank_accounts(id, titulo), payment_method:payment_methods(id, nome, codigo), attachments:transaction_attachments(*)";
+  return "*, vehicle:vehicles(id, brand, model, plate), customer:customers(id, name, cpf_cnpj, email), category:transaction_categories(id, nome), bank_account:bank_accounts(id, titulo), payment_method:payment_methods(id, nome, codigo), attachments:transaction_attachments(*)";
 }
 
 function sanitizeFileName(name: string) {
@@ -102,6 +102,7 @@ function formDataToTransactionValues(formData: FormData): TransactionFormValues 
     tipo: get("tipo") as TransactionType,
     vehicle_id: get("vehicle_id"),
     venda_id: get("venda_id"),
+    customer_id: get("customer_id"),
     categoria_id: get("categoria_id"),
     banco_id: get("banco_id"),
     payment_method_id: get("payment_method_id"),
@@ -245,6 +246,26 @@ export async function createTransactionAction(
     selectedPaymentCode = toPaymentMethodCode(paymentMethod?.codigo);
   }
 
+  const selectedCustomerId = nullableNumber(values.customer_id);
+  let payerName = values.nome_pagador.trim();
+  let payerDocument = values.cpf_cnpj_pagador.trim();
+
+  if (selectedCustomerId) {
+    const { data: customer } = await admin
+      .from("customers")
+      .select("name, cpf_cnpj")
+      .eq("id", selectedCustomerId)
+      .eq("is_deleted", false)
+      .maybeSingle();
+
+    if (!customer) {
+      return { success: false, error: "Cliente selecionado nao encontrado." };
+    }
+
+    payerName = customer.name;
+    payerDocument = customer.cpf_cnpj;
+  }
+
   const payload = {
     descricao: values.descricao.trim(),
     valor,
@@ -254,11 +275,12 @@ export async function createTransactionAction(
     tipo: values.tipo as TransactionType,
     vehicle_id: nullableNumber(values.vehicle_id),
     venda_id: nullableNumber(values.venda_id),
+    customer_id: selectedCustomerId,
     categoria_id: nullableNumber(values.categoria_id),
     banco_id: nullableNumber(values.banco_id),
     payment_method_id: nullableNumber(values.payment_method_id),
-    nome_pagador: values.nome_pagador.trim(),
-    cpf_cnpj_pagador: values.cpf_cnpj_pagador.trim(),
+    nome_pagador: payerName,
+    cpf_cnpj_pagador: payerDocument,
     valor_liquido: parseMoney(values.valor_liquido) ?? valor,
     pendente: values.pendente,
     created_by: user.id,

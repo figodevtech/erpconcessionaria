@@ -39,9 +39,9 @@ export default async function DashboardLayout({
     <PermissionsProvider permissions={permissions}>
       <SidebarProvider>
         <AppSidebar user={mappedUser} permissions={permissions} />
-        <SidebarInset>
+        <SidebarInset className="min-w-0 overflow-hidden">
           <DashboardHeader />
-          <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+          <main className="flex-1 min-w-0 overflow-auto p-4 md:p-6 lg:p-8">
             {children}
           </main>
         </SidebarInset>

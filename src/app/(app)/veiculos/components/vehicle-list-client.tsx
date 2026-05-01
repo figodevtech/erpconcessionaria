@@ -27,7 +27,12 @@ export interface Vehicle {
   year_model: number;
   price: number;
   purchase_price?: number | null;
+  total_receitas?: number;
+  total_despesas?: number;
+  lucro?: number;
+  lucro_percentual?: number;
   fipe?: number | null;
+  show_fipe_price?: boolean;
   mileage?: number | null;
   fuel: string;
   transmission: string;
@@ -76,9 +81,10 @@ export type VehicleListClientProps = {
   status: string
   page: number
   setPage: (p: number) => void
+  onKpisShouldRefresh?: () => void
 }
 
-export function VehicleListClient({ search, status, page, setPage }: VehicleListClientProps) {
+export function VehicleListClient({ search, status, page, setPage, onKpisShouldRefresh }: VehicleListClientProps) {
   const { hasPermission } = usePermissions()
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [totalPages, setTotalPages] = useState(1)
@@ -111,13 +117,14 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
       // If a new vehicle was saved/updated, refresh the selected vehicle state
       if (newVehicle) {
         setSelectedVehicle(newVehicle)
+        onKpisShouldRefresh?.()
       }
     } catch (error) {
       console.error("Failed to fetch vehicles:", error)
     } finally {
       setLoading(false)
     }
-  }, [search, status, page])
+  }, [search, status, page, onKpisShouldRefresh])
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -194,7 +201,7 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
           onSuccess={(v) => fetchVehicles(v)}
         />
       </CardHeader>
-      <CardContent className="min-h-[300px] -mt-[24px] px-4 pb-4 pt-6 relative">
+      <CardContent className="relative -mt-[24px] min-h-[300px] min-w-0 overflow-hidden px-4 pb-4 pt-6">
         <div
           className={`${loading && " opacity-100"
             } transition-all opacity-0 h-0.5 bg-slate-400 w-full overflow-hidden absolute left-0 right-0 top-2`}
@@ -222,7 +229,10 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
                     loading={loading}
                     showImages={showImages}
                     onEdit={handleEditVehicle}
-                    onDeleteSuccess={() => fetchVehicles()}
+                    onDeleteSuccess={() => {
+                      fetchVehicles();
+                      onKpisShouldRefresh?.();
+                    }}
                   />
                 </div>
               </motion.div>
@@ -252,7 +262,10 @@ export function VehicleListClient({ search, status, page, setPage }: VehicleList
                         <VehicleCard
                           vehicle={vehicle}
                           onEdit={handleEditVehicle}
-                          onDeleteSuccess={() => fetchVehicles()}
+                          onDeleteSuccess={() => {
+                            fetchVehicles();
+                            onKpisShouldRefresh?.();
+                          }}
                         />
                       </div>
                     ))

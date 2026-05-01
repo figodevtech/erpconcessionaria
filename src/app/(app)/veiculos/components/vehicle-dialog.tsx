@@ -133,6 +133,7 @@ export interface VehicleFormValues {
   price: number;
   purchase_price?: number | null;
   fipe?: number | null;
+  show_fipe_price: boolean;
   mileage?: number | null;
   fuel: string;
   transmission: string;
@@ -194,6 +195,7 @@ export function VehicleDialog({
       price: 0,
       purchase_price: null,
       fipe: null,
+      show_fipe_price: false,
       mileage: null,
       fuel: "",
       transmission: "",
@@ -262,6 +264,7 @@ export function VehicleDialog({
             price: updatedVehicle.price || 0,
             purchase_price: updatedVehicle.purchase_price || null,
             fipe: updatedVehicle.fipe || null,
+            show_fipe_price: updatedVehicle.show_fipe_price || false,
             mileage: updatedVehicle.mileage || null,
             fuel: updatedVehicle.fuel || "",
             transmission: updatedVehicle.transmission || "",
@@ -309,6 +312,7 @@ export function VehicleDialog({
         price: 0,
         purchase_price: null,
         fipe: null,
+        show_fipe_price: false,
         mileage: null,
         fuel: "",
         transmission: "",
@@ -431,7 +435,6 @@ export function VehicleDialog({
       { key: "version", label: "Versão" },
       { key: "year", label: "Ano Fabr." },
       { key: "year_model", label: "Ano Modelo" },
-      { key: "purchase_price", label: "Preço Compra" },
       { key: "price", label: "Preço" },
       { key: "fuel", label: "Combustível" },
       { key: "transmission", label: "Transmissão" },
@@ -458,7 +461,7 @@ export function VehicleDialog({
       if (field.key === "doors" && values.type === "motorcycles") return;
 
       if (value === undefined || value === null || value === "") {
-        if ((field.key === "price" || field.key === "purchase_price") && (value as any) === 0) return; // Special case: Allow 0 price
+        if (field.key === "price" && (value as any) === 0) return; // Special case: Allow 0 price
         form.setError(field.key as any, { type: "manual", message: `${field.label} é obrigatório(a)` });
         errorMessages.push(`${field.label} é obrigatório(a)`);
         hasError = true;
@@ -479,6 +482,8 @@ export function VehicleDialog({
       const method = isEditing ? "PATCH" : "POST";
       const normalizedValues = {
         ...values,
+        purchase_price: values.purchase_price ?? null,
+        show_fipe_price: values.show_fipe_price ?? false,
         chassi: values.chassi?.trim() || null,
         renavam: values.renavam?.trim() || null,
       };
@@ -607,11 +612,11 @@ export function VehicleDialog({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col min-h-0 overflow-hidden"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
             <Tabs
               defaultValue="Geral"
-              className="flex flex-col min-h-0 overflow-hidden pb-0"
+              className="flex min-h-0 flex-1 flex-col overflow-hidden pb-0"
             >
               <div className="px-2 py-2 bg-muted/30 border-b ">
                 <TabsList className="h-12 bg-background/50 backdrop-blur-sm rounded-xl border -mb-px">
@@ -1379,7 +1384,7 @@ function GeneralTab({
                   "text-xs font-bold uppercase tracking-wider",
                   form.formState.errors.purchase_price && "text-destructive"
                 )}>
-                  Preço Compra (R$) *
+                  Preço Compra (R$)
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -1398,7 +1403,7 @@ function GeneralTab({
                       if (numericValue) {
                         field.onChange(Number(numericValue) / 100);
                       } else {
-                        field.onChange(0);
+                        field.onChange(null);
                       }
                     }}
                   />
@@ -1448,13 +1453,27 @@ function GeneralTab({
             name="fipe"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  FIPE (R$)
+                <FormLabel className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>FIPE (R$)</span>
+                  <FormField
+                    control={form.control}
+                    name="show_fipe_price"
+                    render={({ field: showFipeField }) => (
+                      <div className="flex items-center gap-2 text-[10px] font-normal text-primary/80">
+                        <span>Exibir site</span>
+                        <Switch
+                          checked={showFipeField.value}
+                          onCheckedChange={showFipeField.onChange}
+                          disabled={loading}
+                        />
+                      </div>
+                    )}
+                  />
                 </FormLabel>
                 <FormControl>
                   <div className="relative">
                     <Input
-                    placeholder="R$ 0,00"
+                      placeholder="R$ 0,00"
                       type="text"
                       disabled={loading}
                       className="bg-background/50 rounded-lg h-10"

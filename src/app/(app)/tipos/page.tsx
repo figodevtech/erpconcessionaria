@@ -7,7 +7,6 @@ import {
   CreditCard,
   Files,
   Edit,
-  Layers3,
   Loader2,
   Plus,
   Tags,
@@ -29,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +47,6 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -93,6 +90,7 @@ import { PAYMENT_METHODS, paymentMethodLabel, type PaymentMethod } from "@/lib/t
 
 type DialogMode = "category" | "documentCategory" | "bank" | "payment" | null;
 type EditTarget = TransactionCategory | DocumentCategory | BankAccount | DynamicPaymentMethod | null;
+type TabKey = "categories" | "documents" | "banks" | "payments";
 
 export default function TypesPage() {
   const { hasPermission } = usePermissions();
@@ -103,6 +101,7 @@ export default function TypesPage() {
   const [loading, setLoading] = useState(true);
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [editTarget, setEditTarget] = useState<EditTarget>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>("categories");
 
   const canView = hasPermission("types:view");
   const canCreate = hasPermission("types:create");
@@ -129,219 +128,123 @@ export default function TypesPage() {
     return () => clearTimeout(timeout);
   }, [canView, fetchData]);
 
+  const navItems: {
+    key: TabKey;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    count: number;
+    dialogMode: DialogMode;
+    buttonLabel: string;
+  }[] = [
+    { key: "categories", label: "Categorias de transação", description: "Organize o fluxo de caixa", icon: Tags, count: categories.length, dialogMode: "category", buttonLabel: "Nova categoria" },
+    { key: "documents", label: "Categorias de documentos", description: "Classifique os anexos", icon: Files, count: documentCategories.length, dialogMode: "documentCategory", buttonLabel: "Nova categoria" },
+    { key: "banks", label: "Bancos e contas", description: "Caixas / contas bancárias", icon: Building2, count: bankAccounts.length, dialogMode: "bank", buttonLabel: "Novo banco" },
+    { key: "payments", label: "Métodos de pagamento", description: "Formas de pagamento", icon: CreditCard, count: paymentMethods.length, dialogMode: "payment", buttonLabel: "Novo método" },
+  ];
+
+  const active = navItems.find((n) => n.key === activeTab)!;
+
   if (!canView) return <AccessDenied />;
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <TypeSummaryCard title="Categorias" value={categories.length} icon={Tags} />
-        <TypeSummaryCard title="Documentos" value={documentCategories.length} icon={Files} />
-        <TypeSummaryCard title="Bancos" value={bankAccounts.length} icon={Building2} />
-        <TypeSummaryCard title="Métodos" value={paymentMethods.length} icon={CreditCard} />
-      </div>
+    <>
+    <div className="flex gap-0 overflow-hidden rounded-xl border border-white/6 bg-card">
 
-      <Card>
-        <CardHeader className="border-b-2 pb-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Layers3 className="h-5 w-5 text-primary" />
-                Cadastros de Tipos
-              </CardTitle>
-              <CardDescription className="mt-1">
-                <button
-                  onClick={fetchData}
-                  disabled={loading}
-                  className="inline-flex items-center gap-1 text-foreground/50 hover:text-foreground/70 disabled:opacity-50"
-                >
-                  <span>Recarregar</span>
-                  <Loader2 width={12} className={loading ? "animate-spin" : ""} />
-                </button>
-              </CardDescription>
-            </div>
+      {/* ── Sidebar de navegação ───────────────────────────────────── */}
+      <aside className="hidden w-[220px] shrink-0 flex-col border-r border-white/6 md:flex">
+        <div className="border-b border-white/6 px-4 py-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cadastros</p>
+        </div>
+        <nav className="flex flex-1 flex-col gap-0.5 p-2">
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)
+            : navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setActiveTab(item.key)}
+                    className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${isActive ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-white/4 hover:text-foreground"}`}
+                  >
+                    <Icon className={`h-4 w-4 shrink-0 transition-colors ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
+                    <div className="min-w-0">
+                      <p className={`truncate text-xs font-semibold leading-tight ${isActive ? "text-foreground" : ""}`}>{item.label}</p>
+                      <p className="truncate text-[10px] leading-tight text-muted-foreground">{item.description}</p>
+                    </div>
+                  </button>
+                );
+              })}
+        </nav>
+        <div className="border-t border-white/6 p-3">
+          <button onClick={fetchData} disabled={loading} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] text-muted-foreground transition-colors hover:bg-white/4 hover:text-foreground disabled:opacity-50">
+            <Loader2 className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+            Recarregar
+          </button>
+        </div>
+      </aside>
+
+      {/* ── Painel principal ────────────────────────────────────────── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+
+        {/* Mobile tabs */}
+        <div className="border-b border-white/6 px-4 pt-4 md:hidden">
+          <div className="flex gap-1 overflow-x-auto pb-3">
+            {navItems.map((item) => (
+              <button key={item.key} type="button" onClick={() => setActiveTab(item.key)}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${activeTab === item.key ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {item.label.split(" ")[0]}
+              </button>
+            ))}
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="relative -mt-[24px] min-h-[460px] px-4 pb-4 pt-6">
-          <div className={`${loading ? "opacity-100" : "opacity-0"} absolute left-0 right-0 top-2 h-0.5 overflow-hidden bg-slate-400 transition-all`}>
-            <div className={`${loading ? "animate-slideIn" : ""} absolute left-0 h-full w-1/2 -translate-x-full rounded-lg bg-primary`} />
-          </div>
-
+        {/* Content */}
+        <div className="flex-1 p-5">
           {loading ? (
             <Skeleton className="h-[420px] w-full" />
           ) : (
-            <Tabs defaultValue="categories" className="gap-5">
-              <TabsList className="h-10">
-                <TabsTrigger value="categories" className="px-4">Categorias</TabsTrigger>
-                <TabsTrigger value="documents" className="px-4">Documentos</TabsTrigger>
-                <TabsTrigger value="banks" className="px-4">Bancos</TabsTrigger>
-                <TabsTrigger value="payments" className="px-4">Métodos</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="categories">
-                <TypeSectionHeader
-                  title="Categorias de transação"
-                  description="Classifique receitas e despesas do fluxo de caixa."
-                  buttonLabel="Nova categoria"
-                  onClick={() => {
-                    setEditTarget(null);
-                    setDialogMode("category");
-                  }}
-                  canCreate={canCreate}
-                />
-                <CategoriesTable
-                  items={categories}
-                  onChanged={fetchData}
-                  canUpdate={canUpdate}
-                  canDelete={canDelete}
-                  onEdit={(item) => {
-                    setEditTarget(item);
-                    setDialogMode("category");
-                  }}
-                />
-              </TabsContent>
-
-              <TabsContent value="documents">
-                <TypeSectionHeader
-                  title="Categorias de documentos"
-                  description="Classifique anexos e documentos vinculados aos veículos."
-                  buttonLabel="Nova categoria"
-                  onClick={() => {
-                    setEditTarget(null);
-                    setDialogMode("documentCategory");
-                  }}
-                  canCreate={canCreate}
-                />
-                <DocumentCategoriesTable
-                  items={documentCategories}
-                  onChanged={fetchData}
-                  canUpdate={canUpdate}
-                  canDelete={canDelete}
-                  onEdit={(item) => {
-                    setEditTarget(item);
-                    setDialogMode("documentCategory");
-                  }}
-                />
-              </TabsContent>
-
-              <TabsContent value="banks">
-                <TypeSectionHeader
-                  title="Bancos e contas"
-                  description="Cadastre caixas, contas bancarias e contas de controle."
-                  buttonLabel="Novo banco"
-                  onClick={() => {
-                    setEditTarget(null);
-                    setDialogMode("bank");
-                  }}
-                  canCreate={canCreate}
-                />
-                <BankAccountsTable
-                  items={bankAccounts}
-                  onChanged={fetchData}
-                  canUpdate={canUpdate}
-                  canDelete={canDelete}
-                  onEdit={(item) => {
-                    setEditTarget(item);
-                    setDialogMode("bank");
-                  }}
-                />
-              </TabsContent>
-
-              <TabsContent value="payments">
-                <TypeSectionHeader
-                  title="Métodos de pagamento"
-                  description="Defina as opções disponíveis nos lançamentos financeiros."
-                  buttonLabel="Novo método"
-                  onClick={() => {
-                    setEditTarget(null);
-                    setDialogMode("payment");
-                  }}
-                  canCreate={canCreate}
-                />
-                <PaymentMethodsTable
-                  items={paymentMethods}
-                  onChanged={fetchData}
-                  canUpdate={canUpdate}
-                  canDelete={canDelete}
-                  onEdit={(item) => {
-                    setEditTarget(item);
-                    setDialogMode("payment");
-                  }}
-                />
-              </TabsContent>
-            </Tabs>
+            <>
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">{active.label}</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{active.description}</p>
+                </div>
+                {canCreate && (
+                  <Button size="sm" className="shrink-0" onClick={() => { setEditTarget(null); setDialogMode(active.dialogMode); }}>
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    {active.buttonLabel}
+                  </Button>
+                )}
+              </div>
+              {activeTab === "categories" && <CategoriesTable items={categories} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("category"); }} />}
+              {activeTab === "documents" && <DocumentCategoriesTable items={documentCategories} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("documentCategory"); }} />}
+              {activeTab === "banks" && <BankAccountsTable items={bankAccounts} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("bank"); }} />}
+              {activeTab === "payments" && <PaymentMethodsTable items={paymentMethods} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("payment"); }} />}
+            </>
           )}
-        </CardContent>
-      </Card>
-
-      <TypeCreateDialog
-        mode={dialogMode}
-        target={editTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDialogMode(null);
-            setEditTarget(null);
-          }
-        }}
-        onSuccess={() => {
+        </div>
+      </div>
+    </div>
+    <TypeCreateDialog
+      mode={dialogMode}
+      target={editTarget}
+      onOpenChange={(open) => {
+        if (!open) {
           setDialogMode(null);
           setEditTarget(null);
-          fetchData();
-        }}
-      />
-    </div>
-  );
-}
-
-function TypeSummaryCard({
-  title,
-  value,
-  icon: Icon,
-}: {
-  title: string;
-  value: number;
-  icon: LucideIcon;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-primary" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">registros cadastrados</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TypeSectionHeader({
-  title,
-  description,
-  buttonLabel,
-  onClick,
-  canCreate,
-}: {
-  title: string;
-  description: string;
-  buttonLabel: string;
-  onClick: () => void;
-  canCreate: boolean;
-}) {
-  return (
-    <div className="mb-4 flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 md:flex-row md:items-center md:justify-between">
-      <div>
-        <h3 className="font-semibold">{title}</h3>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-      {canCreate && (
-        <Button size="sm" className="rounded-xl" onClick={onClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          {buttonLabel}
-        </Button>
-      )}
-    </div>
+        }
+      }}
+      onSuccess={() => {
+        setDialogMode(null);
+        setEditTarget(null);
+        fetchData();
+      }}
+    />
+    </>
   );
 }
 

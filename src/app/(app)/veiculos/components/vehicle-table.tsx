@@ -1,18 +1,11 @@
 "use client";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { type Vehicle } from "./vehicle-list-client";
-import Image from "next/image";
 import { useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
+import { Edit, MoreHorizontal, Trash2Icon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,9 +22,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeftRight, Edit, MoreHorizontal, Trash2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { usePermissions } from "@/hooks/use-permissions";
+import { type Vehicle } from "./vehicle-list-client";
 
 export function VehicleTable({
   vehicles,
@@ -49,6 +50,7 @@ export function VehicleTable({
   const { hasPermission } = usePermissions();
   const [isDeleting, setIsDeleting] = useState(false);
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Em venda":
@@ -73,6 +75,16 @@ export function VehicleTable({
     }).format(value || 0);
   };
 
+  const formatPercent = (value?: number) => {
+    return `${Number(value ?? 0).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}%`;
+  };
+
+  const profitClassName = (value?: number) =>
+    Number(value ?? 0) >= 0 ? "text-emerald-600" : "text-red-600";
+
   const handleDelete = async (id: number) => {
     setIsDeleting(true);
     try {
@@ -82,14 +94,14 @@ export function VehicleTable({
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.error || "Erro ao excluir veículo");
+        throw new Error(result.error || "Erro ao excluir veiculo");
       }
 
-      toast.success("Veículo excluído com sucesso!");
+      toast.success("Veiculo excluido com sucesso!");
       onDeleteSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting vehicle:", error);
-      toast.error(error.message || "Erro ao excluir veículo");
+      toast.error(error instanceof Error ? error.message : "Erro ao excluir veiculo");
     } finally {
       setIsDeleting(false);
       setVehicleToDelete(null);
@@ -97,8 +109,10 @@ export function VehicleTable({
   };
 
   return (
-    <div className="w-full relative min-h-[400px] p-4">
-      <Table className="text-xs">
+    <div className="relative min-h-[400px] w-full">
+      <ScrollArea className="w-full">
+        <div className="min-w-full p-4">
+          <Table className="min-w-[1500px] text-xs">
         <TableHeader>
           <TableRow>
             {showImages && <TableHead>Foto</TableHead>}
@@ -106,26 +120,31 @@ export function VehicleTable({
             <TableHead>Marca / Modelo</TableHead>
             <TableHead className="text-center">Ano</TableHead>
             <TableHead className="text-center">Placa</TableHead>
-            <TableHead className="text-center">Preço</TableHead>
+            <TableHead className="text-right">Valor Compra</TableHead>
+            <TableHead className="text-right">Receitas</TableHead>
+            <TableHead className="text-right">Despesas</TableHead>
+            <TableHead className="text-right">Valor Venda</TableHead>
+            <TableHead className="text-right">Lucro</TableHead>
+            <TableHead className="text-right">% Lucro</TableHead>
             <TableHead className="text-center">Status</TableHead>
             <TableHead className="text-center">Adicionado em</TableHead>
-            <TableHead className="text-center">Ações</TableHead>
+            <TableHead className="text-center">Acoes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {vehicles.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={showImages ? 9 : 8}
+                colSpan={showImages ? 14 : 13}
                 className="h-24 text-center text-muted-foreground"
               >
-                Nenhum veículo encontrado para a busca.
+                {loading ? "Carregando veiculos..." : "Nenhum veiculo encontrado para a busca."}
               </TableCell>
             </TableRow>
           ) : (
             vehicles.map((vehicle) => (
               <TableRow
-                className="cursor-pointer h-14"
+                className="h-14 cursor-pointer"
                 key={vehicle.id}
                 onDoubleClick={() => onEdit(vehicle)}
               >
@@ -141,20 +160,35 @@ export function VehicleTable({
                   </TableCell>
                 )}
                 <TableCell>{vehicle.id}</TableCell>
-                <TableCell className="font-medium">
+                <TableCell className="min-w-[240px] font-medium">
                   {vehicle.brand} {vehicle.model} {vehicle.version}
                 </TableCell>
                 <TableCell className="text-center">{vehicle.year}</TableCell>
-                <TableCell className="uppercase text-center">
+                <TableCell className="text-center uppercase">
                   {vehicle.plate || "N/A"}
                 </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(Number(vehicle.purchase_price ?? 0))}
+                </TableCell>
+                <TableCell className="text-right font-medium text-emerald-600">
+                  {formatCurrency(Number(vehicle.total_receitas ?? 0))}
+                </TableCell>
+                <TableCell className="text-right font-medium text-red-600">
+                  {formatCurrency(Number(vehicle.total_despesas ?? 0))}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-primary">
                   {formatCurrency(vehicle.price)}
+                </TableCell>
+                <TableCell className={`text-right font-semibold ${profitClassName(vehicle.lucro)}`}>
+                  {formatCurrency(Number(vehicle.lucro ?? 0))}
+                </TableCell>
+                <TableCell className={`text-right font-semibold ${profitClassName(vehicle.lucro)}`}>
+                  {formatPercent(vehicle.lucro_percentual)}
                 </TableCell>
                 <TableCell className="text-center">
                   <Badge
                     variant="outline"
-                    className={`font-normal border-transparent ${getStatusColor(vehicle.status || "")}`}
+                    className={`border-transparent font-normal ${getStatusColor(vehicle.status || "")}`}
                   >
                     {vehicle.status || "Indefinido"}
                   </Badge>
@@ -180,14 +214,10 @@ export function VehicleTable({
                         <Edit className="mr-2 h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
-                      {/* <DropdownMenuItem className="hover:cursor-pointer bg-blue-600/10 hover:bg-blue-600/20 data-highlighted:bg-blue-600/50 transition-all text-nowrap">
-                        <ArrowLeftRight className="mr-2 h-4 w-4" />
-                        Transferir
-                      </DropdownMenuItem> */}
 
                       {hasPermission("vehicles:delete") && (
                         <DropdownMenuItem
-                          className="hover:cursor-pointer text-destructive focus:text-destructive"
+                          className="text-destructive hover:cursor-pointer focus:text-destructive"
                           onClick={() => setVehicleToDelete(vehicle)}
                         >
                           <Trash2Icon className="mr-2 h-4 w-4" />
@@ -202,6 +232,9 @@ export function VehicleTable({
           )}
         </TableBody>
       </Table>
+      </div>
+      <ScrollBar orientation="horizontal" />
+      </ScrollArea>
 
       <AlertDialog
         open={!!vehicleToDelete}
@@ -209,9 +242,11 @@ export function VehicleTable({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Você tem certeza absoluta?</AlertDialogTitle>
+            <AlertDialogTitle>Voce tem certeza absoluta?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação excluirá o veículo <strong>{vehicleToDelete?.brand} {vehicleToDelete?.model}</strong> permanentemente do marketplace.
+              Esta acao excluira o veiculo{" "}
+              <strong>{vehicleToDelete?.brand} {vehicleToDelete?.model}</strong>{" "}
+              permanentemente do marketplace.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">
@@ -223,11 +258,11 @@ export function VehicleTable({
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+              className="bg-destructive text-destructive-foreground transition-colors hover:bg-destructive/90"
               disabled={isDeleting}
               onClick={() => vehicleToDelete && handleDelete(Number(vehicleToDelete.id))}
             >
-              {isDeleting ? "Excluindo..." : "Sim, excluir veículo"}
+              {isDeleting ? "Excluindo..." : "Sim, excluir veiculo"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

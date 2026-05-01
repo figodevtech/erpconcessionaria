@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { listCustomersAction } from "@/actions/customers";
 import { createTransactionAction } from "@/actions/transactions";
 import { getTypeCatalogAction } from "@/actions/type-catalog";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatFileSize } from "@/lib/documents";
+import { formatCpfCnpj, type Customer } from "@/lib/customers";
 import {
   type TransactionFormValues,
 } from "@/lib/transactions";
@@ -81,6 +83,7 @@ export function TransactionDialog({
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<DynamicPaymentMethod[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [attachment, setAttachment] = useState<File | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,6 +97,7 @@ export function TransactionDialog({
       tipo: "RECEITA",
       vehicle_id: vehicle?.id ?? "",
       venda_id: "",
+      customer_id: "",
       categoria_id: "",
       banco_id: "",
       payment_method_id: "",
@@ -107,6 +111,7 @@ export function TransactionDialog({
   const selectedPaymentId = useWatch({ control: form.control, name: "payment_method_id" });
   const selectedBankId = useWatch({ control: form.control, name: "banco_id" });
   const selectedCategoryId = useWatch({ control: form.control, name: "categoria_id" });
+  const selectedCustomerId = useWatch({ control: form.control, name: "customer_id" });
 
   useEffect(() => {
     if (!open) return;
@@ -120,6 +125,7 @@ export function TransactionDialog({
       tipo: "RECEITA",
       vehicle_id: vehicle?.id ?? "",
       venda_id: "",
+      customer_id: "",
       categoria_id: "",
       banco_id: "",
       payment_method_id: "",
@@ -142,7 +148,10 @@ export function TransactionDialog({
 
     async function fetchOptions() {
       try {
-        const typesResult = await getTypeCatalogAction();
+        const [typesResult, customersResult] = await Promise.all([
+          getTypeCatalogAction(),
+          listCustomersAction({ page: 1, pageSize: 100, status: "ATIVO" }),
+        ]);
 
         if (typesResult.success && typesResult.data) {
           const activeCategories = typesResult.data.categories.filter((item) => item.ativo);
@@ -158,6 +167,12 @@ export function TransactionDialog({
           form.setValue("banco_id", activeBanks[0]?.id.toString() ?? "");
           form.setValue("payment_method_id", activePayments[0]?.id.toString() ?? "");
           form.setValue("metodo_pagamento", activePayments[0]?.codigo ?? "PIX");
+        }
+
+        if (customersResult.success && customersResult.data) {
+          setCustomers(customersResult.data);
+        } else {
+          setCustomers([]);
         }
       } catch {}
     }
@@ -197,6 +212,9 @@ export function TransactionDialog({
   );
   const selectedCategory = categories.find(
     (item) => item.id.toString() === selectedCategoryId,
+  );
+  const selectedCustomer = customers.find(
+    (item) => item.id.toString() === selectedCustomerId,
   );
 
   return (
@@ -448,6 +466,49 @@ export function TransactionDialog({
                     </div>
                   </div>
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="customer_id"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-3">
+                      <FormLabel>Cliente cadastrado</FormLabel>
+                      <Select
+                        value={field.value || "none"}
+                        onValueChange={(value) => {
+                          const nextValue = value === "none" ? "" : value;
+                          field.onChange(nextValue);
+                          const customer = customers.find((item) => item.id.toString() === nextValue);
+                          if (customer) {
+                            form.setValue("nome_pagador", customer.name);
+                            form.setValue("cpf_cnpj_pagador", formatCpfCnpj(customer.cpf_cnpj));
+                          }
+                        }}
+                        disabled={isPending}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <UserRound className="mr-2 h-4 w-4 text-muted-foreground" />
+                            <span className="truncate text-left">
+                              {selectedCustomer
+                                ? `${selectedCustomer.name} - ${formatCpfCnpj(selectedCustomer.cpf_cnpj)}`
+                                : "Nao vincular cliente"}
+                            </span>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent alignItemWithTrigger={false}>
+                          <SelectItem value="none">Nao vincular cliente</SelectItem>
+                          {customers.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id.toString()}>
+                              {customer.name} - {formatCpfCnpj(customer.cpf_cnpj)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}

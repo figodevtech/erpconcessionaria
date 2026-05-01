@@ -134,7 +134,8 @@ function VehicleFinancialKpis({
   const expectedProfit = salePrice - currentCost;
   const expectedProfitPercent = currentCost > 0 ? (expectedProfit / currentCost) * 100 : 0;
 
-  const items = [
+
+  const itemsGrid = [
     {
       title: "PREÇO FIPE",
       value: formatCurrency(fipe),
@@ -150,20 +151,6 @@ function VehicleFinancialKpis({
       className: "text-violet-600",
     },
     {
-      title: "DESPESAS",
-      value: formatCurrency(expenses),
-      hint: "Registradas no financeiro",
-      icon: ArrowDownCircle,
-      className: "text-red-600",
-    },
-    {
-      title: "RECEITAS",
-      value: formatCurrency(revenues),
-      hint: "Registradas no financeiro",
-      icon: ArrowUpCircle,
-      className: "text-emerald-600",
-    },
-    {
       title: "CUSTO ATUAL DO CARRO",
       value: formatCurrency(currentCost),
       hint: "Compra + despesas - receitas",
@@ -176,6 +163,25 @@ function VehicleFinancialKpis({
       hint: "Definido no cadastro do veículo",
       icon: DollarSign,
       className: "text-primary",
+    },
+  ]
+
+  const itemsList = [
+
+
+    {
+      title: "DESPESAS",
+      value: formatCurrency(expenses),
+      hint: "Registradas no financeiro",
+      icon: ArrowDownCircle,
+      className: "text-red-600",
+    },
+    {
+      title: "RECEITAS",
+      value: formatCurrency(revenues),
+      hint: "Registradas no financeiro",
+      icon: ArrowUpCircle,
+      className: "text-emerald-600",
     },
     {
       title: "LUCRO PREVISTO",
@@ -197,23 +203,46 @@ function VehicleFinancialKpis({
   ];
 
   return (
-    <div className="grid gap-4 grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
-      {items.map((item) => (
-        <Card key={item.title} className="overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className=" text-[10px] md:text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {item.title}
-            </CardTitle>
-            <item.icon className={`h-4 w-4 ${item.className}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-sm md:text-xl font-bold tracking-tight ${item.className}`}>
-              {item.value}
-            </div>
-            <p className="mt-1 text-[10px] md:text-xs text-muted-foreground">{item.hint}</p>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="grid gap-4 grid-cols-2 md:grid-cols-2 xl:grid-cols-2">
+
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-2 xl:grid-cols-2">
+        {itemsGrid.map((item) => (
+          <Card key={item.title} className="overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className=" text-[10px] md:text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {item.title}
+              </CardTitle>
+              <item.icon className={`h-4 w-4 ${item.className}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-sm md:text-xl font-bold tracking-tight ${item.className}`}>
+                {item.value}
+              </div>
+              <p className="mt-1 text-[10px] md:text-xs text-muted-foreground">{item.hint}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid gap-4 gri  d-cols-2 md:grid-cols-2 xl:grid-cols-2">
+        {itemsList.map((item) => (
+          <Card key={item.title} className="overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className=" text-[10px] md:text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {item.title}
+              </CardTitle>
+              <item.icon className={`h-4 w-4 ${item.className}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-sm md:text-xl font-bold tracking-tight ${item.className}`}>
+                {item.value}
+              </div>
+              <p className="mt-1 text-[10px] md:text-xs text-muted-foreground">{item.hint}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
+
   );
 }

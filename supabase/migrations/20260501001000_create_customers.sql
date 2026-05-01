@@ -8,9 +8,6 @@ begin
     create type public.customer_status as enum ('ATIVO', 'INATIVO');
   end if;
 
-  if not exists (select 1 from pg_type where typname = 'customer_rank') then
-    create type public.customer_rank as enum ('LEAD', 'BRONZE', 'PRATA', 'OURO', 'VIP');
-  end if;
 end
 $$;
 
@@ -32,9 +29,6 @@ create table if not exists public.customers (
   municipal_registration text null,
   city_code text null,
   status public.customer_status not null default 'ATIVO',
-  rank public.customer_rank null,
-  ranked_by uuid null,
-  ranked_at timestamp with time zone null,
   user_id uuid null,
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
@@ -45,13 +39,10 @@ create table if not exists public.customers (
   deleted_by uuid null,
   constraint customers_pkey primary key (id),
   constraint customers_user_id_key unique (user_id),
-  constraint customers_email_key unique (email),
-  constraint customers_cpf_cnpj_key unique (cpf_cnpj),
   constraint customers_user_id_fkey foreign key (user_id) references auth.users (id),
   constraint customers_created_by_fkey foreign key (created_by) references public.users (id),
   constraint customers_updated_by_fkey foreign key (updated_by) references public.users (id),
   constraint customers_deleted_by_fkey foreign key (deleted_by) references public.users (id),
-  constraint customers_ranked_by_fkey foreign key (ranked_by) references public.users (id),
   constraint customers_email_format_chk check (email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$')
 );
 
@@ -59,6 +50,8 @@ create index if not exists idx_customers_cpf_cnpj on public.customers using btre
 create index if not exists idx_customers_status on public.customers using btree (status);
 create index if not exists idx_customers_is_deleted on public.customers using btree (is_deleted);
 create index if not exists idx_customers_user_id on public.customers using btree (user_id);
+create unique index if not exists idx_customers_active_email_unique on public.customers (lower(email)) where is_deleted = false;
+create unique index if not exists idx_customers_active_cpf_cnpj_unique on public.customers (cpf_cnpj) where is_deleted = false;
 
 alter table public.customers enable row level security;
 
@@ -66,20 +59,57 @@ drop policy if exists "Authenticated users can read customers" on public.custome
 create policy "Authenticated users can read customers"
 on public.customers for select
 to authenticated
-using (is_deleted = false);
+using (
+  is_deleted = false
+  and exists (
+    select 1
+    from public.users u
+    join public.profiles p on p.id = u.profile_id
+    left join public.role_permissions rp on rp.role_name = p.name
+    where u.id = auth.uid()
+      and (p.name = 'Administrador' or rp.permission_slug in ('admin', 'customers:view'))
+  )
+);
 
 drop policy if exists "Authenticated users can insert customers" on public.customers;
 create policy "Authenticated users can insert customers"
 on public.customers for insert
 to authenticated
-with check (true);
+with check (
+  exists (
+    select 1
+    from public.users u
+    join public.profiles p on p.id = u.profile_id
+    left join public.role_permissions rp on rp.role_name = p.name
+    where u.id = auth.uid()
+      and (p.name = 'Administrador' or rp.permission_slug in ('admin', 'customers:create'))
+  )
+);
 
 drop policy if exists "Authenticated users can update customers" on public.customers;
 create policy "Authenticated users can update customers"
 on public.customers for update
 to authenticated
-using (true)
-with check (true);
+using (
+  exists (
+    select 1
+    from public.users u
+    join public.profiles p on p.id = u.profile_id
+    left join public.role_permissions rp on rp.role_name = p.name
+    where u.id = auth.uid()
+      and (p.name = 'Administrador' or rp.permission_slug in ('admin', 'customers:update'))
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.users u
+    join public.profiles p on p.id = u.profile_id
+    left join public.role_permissions rp on rp.role_name = p.name
+    where u.id = auth.uid()
+      and (p.name = 'Administrador' or rp.permission_slug in ('admin', 'customers:update'))
+  )
+);
 
 insert into public.permissions (slug, module, action, description)
 select *

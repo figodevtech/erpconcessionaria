@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from "react";
 import { getRolesAction } from "@/actions/roles";
 import { UserKPIs } from "./components/user-kpis";
 import { UserManagerClient } from "./components/user-manager-client";
-import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -51,7 +50,6 @@ export default function UsersPage() {
     uniqueProfiles: number;
     inactiveUsers: number;
   } | null>(null);
-  const [kpiLoading, setKpiLoading] = useState(true);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -69,23 +67,23 @@ export default function UsersPage() {
   }, []);
 
   const fetchKPIs = useCallback(async () => {
-    setKpiLoading(true);
     const result = await getUserKPIsAction();
     if (result.success) {
       setKpiData(result.data || null);
     }
-    setKpiLoading(false);
   }, []);
 
+  const refresh = useCallback(() => {
+    fetchUsers();
+    fetchRoles();
+    fetchKPIs();
+  }, [fetchUsers, fetchRoles, fetchKPIs]);
+
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      fetchUsers();
-      fetchRoles();
-      fetchKPIs();
-    }, 100);
+    const timeout = setTimeout(refresh, 100);
 
     return () => clearTimeout(timeout);
-  }, [fetchUsers, fetchRoles, fetchKPIs]);
+  }, [refresh]);
 
   const handleNew = () => {
     setSelectedUser(null);
@@ -98,27 +96,16 @@ export default function UsersPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <Suspense
-        fallback={
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-          </div>
-        }
-      >
-        {kpiLoading || !kpiData ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-          </div>
-        ) : (
-          <UserKPIs data={kpiData} />
-        )}
-      </Suspense>
+      {!kpiData ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+      ) : (
+        <UserKPIs data={kpiData} />
+      )}
 
       <UserFilters search={search} setSearch={setSearch} setPage={setPage} />
 
@@ -131,7 +118,7 @@ export default function UsersPage() {
               </CardTitle>
               <CardDescription className="mt-1">
                 <button
-                  onClick={() => fetchUsers()}
+                  onClick={refresh}
                   disabled={loading}
                   className="inline-flex items-center gap-1 text-foreground/50 hover:text-foreground/70 hover:cursor-pointer disabled:opacity-50"
                 >
@@ -168,7 +155,7 @@ export default function UsersPage() {
               <UserManagerClient
                 users={users}
                 loading={loading}
-                onSuccess={fetchUsers}
+                onSuccess={refresh}
                 page={page}
                 setPage={setPage}
                 count={count}
@@ -185,7 +172,7 @@ export default function UsersPage() {
         onOpenChange={setDialogOpen}
         user={selectedUser}
         profiles={roles}
-        onSuccess={fetchUsers}
+        onSuccess={refresh}
       />
     </div>
   );

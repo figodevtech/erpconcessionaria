@@ -1,8 +1,21 @@
 "use client";
 
 import { useEffect, useTransition } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { Building2, CheckCircle2, IdCard, Loader2, Mail, MapPin, Phone, Star, UserRound } from "lucide-react";
+import type React from "react";
+import { useForm, useWatch, type Control } from "react-hook-form";
+import {
+  Building2,
+  FileText,
+  IdCard,
+  Loader2,
+  Mail,
+  MapPin,
+  Phone,
+  Save,
+  Search,
+  UserRound,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { createCustomerAction, updateCustomerAction } from "@/actions/customers";
 import { Button } from "@/components/ui/button";
@@ -10,8 +23,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
@@ -31,8 +42,6 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import {
-  CUSTOMER_RANKS,
-  customerRankLabel,
   formatCpfCnpj,
   formatPhone,
   formatZipCode,
@@ -40,7 +49,6 @@ import {
   type Customer,
   type CustomerFormValues,
   type CustomerPersonType,
-  type CustomerRank,
   type CustomerStatus,
 } from "@/lib/customers";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -69,7 +77,16 @@ const defaultValues: CustomerFormValues = {
   municipal_registration: "",
   city_code: "",
   status: "ATIVO",
-  rank: "",
+};
+
+type ViaCepResponse = {
+  erro?: boolean;
+  logradouro?: string;
+  bairro?: string;
+  localidade?: string;
+  uf?: string;
+  complemento?: string;
+  ibge?: string;
 };
 
 export function CustomerDialog({
@@ -80,13 +97,17 @@ export function CustomerDialog({
 }: CustomerDialogProps) {
   const { hasPermission } = usePermissions();
   const [isPending, startTransition] = useTransition();
+  const [isLookingUpZip, startZipLookup] = useTransition();
   const isEditing = !!customer;
   const canSave = hasPermission(isEditing ? "customers:update" : "customers:create");
 
   const form = useForm<CustomerFormValues>({ defaultValues });
   const personType = useWatch({ control: form.control, name: "person_type" });
   const status = useWatch({ control: form.control, name: "status" });
-  const rank = useWatch({ control: form.control, name: "rank" });
+  const watchedName = useWatch({ control: form.control, name: "name" });
+  const watchedDocument = useWatch({ control: form.control, name: "cpf_cnpj" });
+  const watchedCity = useWatch({ control: form.control, name: "city" });
+  const watchedState = useWatch({ control: form.control, name: "state" });
 
   useEffect(() => {
     if (!open) return;
@@ -108,18 +129,47 @@ export function CustomerDialog({
         municipal_registration: customer.municipal_registration || "",
         city_code: customer.city_code || "",
         status: customer.status,
-        rank: customer.rank || "",
       });
     } else {
       form.reset(defaultValues);
     }
   }, [customer, form, open]);
 
+  function lookupZipCode() {
+    const zipCode = onlyDigits(form.getValues("zip_code") || "");
+    if (zipCode.length !== 8) {
+      toast.error("Informe um CEP com 8 dígitos.");
+      return;
+    }
+
+    startZipLookup(async () => {
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${zipCode}/json/`);
+        const data = (await response.json()) as ViaCepResponse;
+
+        if (!response.ok || data.erro) {
+          toast.error("CEP não encontrado.");
+          return;
+        }
+
+        form.setValue("address", data.logradouro || "");
+        form.setValue("neighborhood", data.bairro || "");
+        form.setValue("city", data.localidade || "");
+        form.setValue("state", data.uf || "");
+        form.setValue("address_complement", data.complemento || form.getValues("address_complement") || "");
+        form.setValue("city_code", data.ibge || "");
+      } catch {
+        toast.error("Não foi possível consultar o CEP.");
+      }
+    });
+  }
+
   function onSubmit(values: CustomerFormValues) {
     startTransition(async () => {
-      const result = isEditing && customer
-        ? await updateCustomerAction(customer.id, values)
-        : await createCustomerAction(values);
+      const result =
+        isEditing && customer
+          ? await updateCustomerAction(customer.id, values)
+          : await createCustomerAction(values);
 
       if (result.success) {
         toast.success(isEditing ? "Cliente atualizado" : "Cliente cadastrado");
@@ -131,256 +181,392 @@ export function CustomerDialog({
     });
   }
 
+  const documentLabel = personType === "PF" ? "CPF" : "CNPJ";
+  const nameLabel = personType === "PF" ? "Nome completo" : "Razão social";
+  const summaryName =
+    watchedName?.trim() || (isEditing ? `Cliente #${customer?.id}` : "Novo cliente");
+  const summaryLocation = [watchedCity, watchedState].filter(Boolean).join(" / ");
+  const isActive = status === "ATIVO";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-svh w-[100dvw] max-w-[100dvw] flex-col overflow-hidden border-none p-0 shadow-2xl sm:max-h-[min(90vh,850px)] sm:w-[95vw] sm:max-w-[1100px]">
-        <DialogHeader className="shrink-0 border-b bg-card/50 px-8 py-6 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-primary/10 p-2 text-primary">
-              <UserRound className="h-6 w-6" />
+      <DialogContent className="flex h-svh w-[100dvw] max-w-[100dvw] flex-col overflow-hidden border-0 bg-[#0d0d0f] p-0 text-zinc-100 shadow-[0_0_60px_rgba(0,0,0,0.8)] sm:h-[min(90vh,860px)] sm:w-[95vw] sm:max-w-[1100px] sm:rounded-2xl">
+
+        {/* ── HEADER ─────────────────────────────────────────────────── */}
+        <div className="relative shrink-0 overflow-hidden border-b border-white/5 bg-[#111113]">
+          {/* accent top stripe */}
+          <div className="absolute inset-x-0 top-0 h-[2px] bg-white/8" />
+
+          <div className="flex items-start justify-between px-6 pb-5 pt-6 sm:px-8">
+            <div className="flex items-center gap-4">
+              {/* Avatar */}
+              <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/6 ring-1 ring-white/10">
+                {personType === "PF" ? (
+                  <UserRound className="h-6 w-6 text-zinc-300" />
+                ) : (
+                  <Building2 className="h-6 w-6 text-zinc-300" />
+                )}
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <DialogTitle className="text-lg font-bold tracking-tight text-zinc-50">
+                    {summaryName}
+                  </DialogTitle>
+                  {/* Status badge */}
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/6 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 ring-1 ring-white/10">
+                    <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-green-300" : "bg-red-300"}`} />
+                    {isActive ? "Ativo" : "Inativo"}
+                  </span>
+                </div>
+                <DialogDescription className="mt-0.5 text-sm text-zinc-500">
+                  {watchedDocument
+                    ? formatCpfCnpj(watchedDocument)
+                    : "Documento pendente"}
+                  {summaryLocation ? ` · ${summaryLocation}` : ""}
+                  {" · "}
+                  {isEditing ? `Edição · #${customer?.id}` : "Novo cadastro"}
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className="text-2xl font-bold tracking-tight">
-                {isEditing ? "Editar cliente" : "Novo cliente"}
-              </DialogTitle>
-              <DialogDescription className="mt-1 text-sm text-muted-foreground">
-                {isEditing
-                  ? "Atualize os dados cadastrais, fiscais e de contato do cliente."
-                  : "Cadastre um cliente para vincular vendas, documentos e operações futuras."}
-              </DialogDescription>
-            </div>
+
+            {/* Close button */}
+            {/* <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button> */}
           </div>
-        </DialogHeader>
+        </div>
 
+        {/* ── FORM BODY ───────────────────────────────────────────────── */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <ScrollArea className="flex-1 bg-muted-foreground/5">
-              <div className="grid grid-cols-1 gap-6 p-8 md:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="person_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo de pessoa*</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={(value) => {
-                          field.onChange(value as CustomerPersonType);
-                          form.setValue("cpf_cnpj", "");
-                        }}
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="space-y-5 p-6 sm:p-8">
+
+                {/* ── SECTION: Identificação ──────────────────────────── */}
+                <FormSection
+                  icon={<IdCard className="h-4 w-4 text-zinc-500" />}
+                  label="Identificação"
+                >
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[0.6fr_1fr_0.6fr_0.8fr]">
+                    {/* Tipo de pessoa */}
+                    <FormField
+                      control={form.control}
+                      name="person_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                            Tipo de pessoa *
+                          </FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value as CustomerPersonType);
+                              form.setValue("cpf_cnpj", "");
+                            }}
+                            disabled={isPending || !canSave}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-10 border-white/8 bg-white/4 text-zinc-100 focus:ring-amber-500/40 focus:border-amber-500/50 hover:bg-white/6 transition-colors">
+                                <span>
+                                  {personType === "PF" ? "Pessoa física" : "Pessoa jurídica"}
+                                </span>
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent alignItemWithTrigger={false}>
+                              <SelectItem value="PF">Pessoa física</SelectItem>
+                              <SelectItem value="PJ">Pessoa jurídica</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Documento */}
+                    <MaskedInput
+                      control={form.control}
+                      name="cpf_cnpj"
+                      label={`${documentLabel} *`}
+                      icon={IdCard}
+                      placeholder={personType === "PF" ? "000.000.000-00" : "00.000.000/0000-00"}
+                      disabled={isPending || !canSave}
+                      required
+                      valueFormatter={formatCpfCnpj}
+                      valueParser={(value) =>
+                        onlyDigits(value).slice(0, personType === "PF" ? 11 : 14)
+                      }
+                    />
+
+                    {/* Status */}
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                            Status
+                          </FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={(value) =>
+                              field.onChange(value as CustomerStatus)
+                            }
+                            disabled={isPending || !canSave}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-10 border-white/8 bg-white/4 text-zinc-100 focus:ring-amber-500/40 focus:border-amber-500/50 hover:bg-white/6 transition-colors">
+                                <span>{isActive ? "Ativo" : "Inativo"}</span>
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent alignItemWithTrigger={false}>
+                              <SelectItem value="ATIVO">Ativo</SelectItem>
+                              <SelectItem value="INATIVO">Inativo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Nome / Razão social */}
+                    <TextInput
+                    className="col-span-full"
+                      control={form.control}
+                      name="name"
+                      label={`${nameLabel} *`}
+                      icon={UserRound}
+                      placeholder={nameLabel}
+                      disabled={isPending || !canSave}
+                      required
+                    />
+                  </div>
+                </FormSection>
+
+                {/* ── SECTION: Contato ────────────────────────────────── */}
+                <FormSection
+                  icon={<Phone className="h-4 w-4 text-zinc-500" />}
+                  label="Contato"
+                >
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <TextInput
+                      control={form.control}
+                      name="email"
+                      label="Email *"
+                      icon={Mail}
+                      placeholder="cliente@exemplo.com"
+                      disabled={isPending || !canSave}
+                      required
+                      type="email"
+                    />
+                    <MaskedInput
+                      control={form.control}
+                      name="phone"
+                      label="Telefone *"
+                      icon={Phone}
+                      placeholder="(83) 99999-9999"
+                      disabled={isPending || !canSave}
+                      required
+                      valueFormatter={formatPhone}
+                      valueParser={(value) => onlyDigits(value).slice(0, 11)}
+                    />
+                  </div>
+                </FormSection>
+
+                {/* ── SECTION: Endereço ───────────────────────────────── */}
+                <FormSection
+                  icon={<MapPin className="h-4 w-4 text-zinc-500" />}
+                  label="Endereço"
+                >
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {/* CEP com busca */}
+                    <FormField
+                      control={form.control}
+                      name="zip_code"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                            CEP
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Input
+                                className="h-10 border-white/8 bg-white/4 pr-10 text-zinc-100 placeholder:text-zinc-600 focus-visible:border-white/20 focus-visible:ring-white/10 transition-colors"
+                                placeholder="00000-000"
+                                value={formatZipCode(field.value || "")}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    onlyDigits(e.target.value).slice(0, 8)
+                                  )
+                                }
+                                disabled={isPending || !canSave || isLookingUpZip}
+                              />
+                              <button
+                                type="button"
+                                onClick={lookupZipCode}
+                                disabled={isPending || !canSave || isLookingUpZip}
+                                aria-label="Buscar CEP"
+                                className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-r-md text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200 disabled:opacity-40"
+                              >
+                                {isLookingUpZip ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Search className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <TextInput
+                      control={form.control}
+                      name="address"
+                      label="Logradouro"
+                      icon={MapPin}
+                      disabled={isPending || !canSave}
+                      className="lg:col-span-2"
+                    />
+                    <TextInput
+                      control={form.control}
+                      name="address_number"
+                      label="Número"
+                      disabled={isPending || !canSave}
+                    />
+                    <TextInput
+                      control={form.control}
+                      name="neighborhood"
+                      label="Bairro"
+                      disabled={isPending || !canSave}
+                    />
+                    <TextInput
+                      control={form.control}
+                      name="city"
+                      label="Cidade *"
+                      disabled={isPending || !canSave}
+                      required
+                    />
+                    <TextInput
+                      control={form.control}
+                      name="state"
+                      label="Estado *"
+                      disabled={isPending || !canSave}
+                      required
+                      maxLength={2}
+                      uppercase
+                    />
+                    <TextInput
+                      control={form.control}
+                      name="address_complement"
+                      label="Complemento"
+                      disabled={isPending || !canSave}
+                    />
+                  </div>
+                </FormSection>
+
+                {/* ── SECTION: Dados fiscais — só para PJ ─────────────── */}
+                {personType === "PJ" && (
+                  <FormSection
+                    icon={<FileText className="h-4 w-4 text-zinc-500" />}
+                    label="Dados fiscais"
+                  >
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <TextInput
+                        control={form.control}
+                        name="state_registration"
+                        label="Inscrição estadual"
                         disabled={isPending || !canSave}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span>{personType === "PF" ? "Pessoa física" : "Pessoa jurídica"}</span>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectItem value="PF">Pessoa física</SelectItem>
-                          <SelectItem value="PJ">Pessoa jurídica</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="cpf_cnpj"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{personType === "PF" ? "CPF*" : "CNPJ*"}</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <IdCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            className="pl-9"
-                            placeholder={personType === "PF" ? "000.000.000-00" : "00.000.000/0000-00"}
-                            value={formatCpfCnpj(field.value)}
-                            onChange={(event) => field.onChange(onlyDigits(event.target.value).slice(0, personType === "PF" ? 11 : 14))}
-                            disabled={isPending || !canSave}
-                            required
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select value={field.value} onValueChange={(value) => field.onChange(value as CustomerStatus)} disabled={isPending || !canSave}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <span>{status === "ATIVO" ? "Ativo" : "Inativo"}</span>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectItem value="ATIVO">Ativo</SelectItem>
-                          <SelectItem value="INATIVO">Inativo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>{personType === "PF" ? "Nome completo*" : "Razão social*"}</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <UserRound className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input className="pl-9" placeholder="Nome ou razão social" {...field} disabled={isPending || !canSave} required />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="rank"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Classificação</FormLabel>
-                      <Select value={field.value || "none"} onValueChange={(value) => field.onChange(value === "none" ? "" : value as CustomerRank)} disabled={isPending || !canSave}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <Star className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span>{customerRankLabel(rank || null)}</span>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectItem value="none">Sem classificação</SelectItem>
-                          {CUSTOMER_RANKS.map((item) => (
-                            <SelectItem key={item} value={item}>{customerRankLabel(item)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>E-mail*</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input type="email" className="pl-9" placeholder="cliente@exemplo.com" {...field} disabled={isPending || !canSave} required />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Telefone*</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            className="pl-9"
-                            placeholder="(83) 99999-9999"
-                            value={formatPhone(field.value)}
-                            onChange={(event) => field.onChange(onlyDigits(event.target.value).slice(0, 11))}
-                            disabled={isPending || !canSave}
-                            required
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="zip_code"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CEP</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="00000-000"
-                          value={formatZipCode(field.value || "")}
-                          onChange={(event) => field.onChange(onlyDigits(event.target.value).slice(0, 8))}
-                          disabled={isPending || !canSave}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Endereço</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input className="pl-9" placeholder="Rua, avenida ou logradouro" {...field} disabled={isPending || !canSave} />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <TextInput control={form.control} name="address_number" label="Número" disabled={isPending || !canSave} />
-                <TextInput control={form.control} name="address_complement" label="Complemento" disabled={isPending || !canSave} />
-                <TextInput control={form.control} name="neighborhood" label="Bairro" disabled={isPending || !canSave} />
-                <TextInput control={form.control} name="city" label="Cidade*" disabled={isPending || !canSave} required />
-                <TextInput control={form.control} name="state" label="UF*" disabled={isPending || !canSave} required maxLength={2} uppercase />
-                <TextInput control={form.control} name="city_code" label="Código do município" disabled={isPending || !canSave} />
-                <TextInput control={form.control} name="state_registration" label="Inscrição estadual" disabled={isPending || !canSave} />
-                <TextInput control={form.control} name="municipal_registration" label="Inscrição municipal" disabled={isPending || !canSave} />
+                      />
+                      <TextInput
+                        control={form.control}
+                        name="municipal_registration"
+                        label="Inscrição municipal"
+                        disabled={isPending || !canSave}
+                      />
+                      <TextInput
+                        control={form.control}
+                        name="city_code"
+                        label="Código do município"
+                        disabled={isPending || !canSave}
+                      />
+                    </div>
+                  </FormSection>
+                )}
               </div>
             </ScrollArea>
 
-            <DialogFooter className="shrink-0 border-t bg-card/50 px-8 py-4 backdrop-blur-md">
-              <div className="flex w-full justify-end gap-3 pb-4 pr-4">
-                <Button type="button" variant="outline" className="rounded-xl px-6" onClick={() => onOpenChange(false)} disabled={isPending}>
+            {/* ── FOOTER ────────────────────────────────────────────── */}
+            <div className="shrink-0 border-t border-white/5 bg-[#111113] px-6 py-4 sm:px-8">
+              <div className="flex w-full items-center justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 px-5 text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isPending}
+                >
                   Cancelar
                 </Button>
                 {canSave && (
-                  <Button type="submit" className="rounded-xl px-8 shadow-lg shadow-primary/20" disabled={isPending}>
-                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                    Salvar cliente
+                  <Button
+                    type="submit"
+                    disabled={isPending}
+                    className=" h-10 bg-blue-800 px-7 font-semibold shadow-lg shadow-blue-500/20 transition-all hover:cursor-pointer hover:shadow-blue-500/25 active:scale-[0.98] disabled:opacity-60"
+                  >
+                    {isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    {isEditing ? "Salvar alterações" : "Cadastrar cliente"}
                   </Button>
                 )}
               </div>
-            </DialogFooter>
+            </div>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
   );
 }
+
+/* ─── FormSection ──────────────────────────────────────────────────────── */
+
+const sectionClass = "border-white/6 bg-white/[0.02]";
+
+function FormSection({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`rounded-xl border ${sectionClass} p-5`}>
+      <div className="mb-4 flex items-center gap-2">
+        {icon}
+        <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+          {label}
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ─── TextInput ────────────────────────────────────────────────────────── */
 
 function TextInput({
   control,
@@ -390,14 +576,82 @@ function TextInput({
   required,
   maxLength,
   uppercase,
+  icon: Icon,
+  placeholder,
+  type = "text",
+  className,
 }: {
-  control: ReturnType<typeof useForm<CustomerFormValues>>["control"];
+  control: Control<CustomerFormValues>;
   name: keyof CustomerFormValues;
   label: string;
   disabled: boolean;
   required?: boolean;
   maxLength?: number;
   uppercase?: boolean;
+  icon?: React.ComponentType<{ className?: string }>;
+  placeholder?: string;
+  type?: string;
+  className?: string;
+}) {
+  return (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem className={className}>
+          <FormLabel className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            {label}
+          </FormLabel>
+          <FormControl>
+            <div className="relative">
+              {Icon && (
+                <Icon className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+              )}
+              <Input
+                type={type}
+                value={(field.value as string) || ""}
+                onChange={(e) =>
+                  field.onChange(
+                    uppercase ? e.target.value.toUpperCase() : e.target.value
+                  )
+                }
+                disabled={disabled}
+                required={required}
+                maxLength={maxLength}
+                placeholder={placeholder}
+                className={`h-10 border-white/8 bg-white/4 text-zinc-100 placeholder:text-zinc-600 transition-colors focus-visible:border-white/20 focus-visible:ring-white/10 hover:bg-white/6 ${Icon ? "pl-9" : ""} ${uppercase ? "uppercase" : ""}`}
+              />
+            </div>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+}
+
+/* ─── MaskedInput ──────────────────────────────────────────────────────── */
+
+function MaskedInput({
+  control,
+  name,
+  label,
+  disabled,
+  required,
+  icon: Icon,
+  placeholder,
+  valueFormatter,
+  valueParser,
+}: {
+  control: Control<CustomerFormValues>;
+  name: keyof CustomerFormValues;
+  label: string;
+  disabled: boolean;
+  required?: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  placeholder?: string;
+  valueFormatter: (value: string) => string;
+  valueParser: (value: string) => string;
 }) {
   return (
     <FormField
@@ -405,16 +659,21 @@ function TextInput({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>{label}</FormLabel>
+          <FormLabel className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            {label}
+          </FormLabel>
           <FormControl>
-            <Input
-              value={(field.value as string) || ""}
-              onChange={(event) => field.onChange(uppercase ? event.target.value.toUpperCase() : event.target.value)}
-              disabled={disabled}
-              required={required}
-              maxLength={maxLength}
-              className={uppercase ? "uppercase" : undefined}
-            />
+            <div className="relative">
+              <Icon className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+              <Input
+                className="h-10 border-white/8 bg-white/4 pl-9 text-zinc-100 placeholder:text-zinc-600 transition-colors focus-visible:border-white/20 focus-visible:ring-white/10 hover:bg-white/6"
+                placeholder={placeholder}
+                value={valueFormatter((field.value as string) || "")}
+                onChange={(e) => field.onChange(valueParser(e.target.value))}
+                disabled={disabled}
+                required={required}
+              />
+            </div>
           </FormControl>
           <FormMessage />
         </FormItem>

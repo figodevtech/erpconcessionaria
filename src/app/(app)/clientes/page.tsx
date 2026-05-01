@@ -32,7 +32,6 @@ export default function ClientesPage() {
   const [status, setStatus] = useState<"TODOS" | CustomerStatus>("TODOS");
   const [personType, setPersonType] = useState<"TODOS" | CustomerPersonType>("TODOS");
   const [loading, setLoading] = useState(true);
-  const [kpiLoading, setKpiLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const canView = hasPermission("customers:view");
@@ -51,12 +50,10 @@ export default function ClientesPage() {
   }, [page, personType, search, status]);
 
   const fetchKpis = useCallback(async () => {
-    setKpiLoading(true);
     const result = await getCustomerKpisAction();
     if (result.success && result.data) {
       setKpis(result.data);
     }
-    setKpiLoading(false);
   }, []);
 
   const refresh = useCallback(() => {
@@ -74,7 +71,7 @@ export default function ClientesPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      {kpiLoading || !kpis ? (
+      {!kpis ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />

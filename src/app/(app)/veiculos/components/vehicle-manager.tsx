@@ -4,7 +4,11 @@ import { useState } from "react"
 import { VehicleFilters } from "./vehicle-filters"
 import { VehicleListClient } from "./vehicle-list-client"
 
-export function VehicleManager() {
+export function VehicleManager({
+  onKpisShouldRefresh,
+}: {
+  onKpisShouldRefresh?: () => void;
+}) {
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("Todos")
   const [page, setPage] = useState(1)
@@ -23,6 +27,7 @@ export function VehicleManager() {
         status={status}
         page={page}
         setPage={setPage}
+        onKpisShouldRefresh={onKpisShouldRefresh}
       />
     </>
   )

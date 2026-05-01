@@ -1,19 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient, createClient } from "@/utils/supabase/server";
 import { checkPermission } from "@/utils/permissions";
 import {
   CUSTOMER_PERSON_TYPES,
-  CUSTOMER_RANKS,
   CUSTOMER_STATUSES,
+  isValidCustomerDocument,
   onlyDigits,
   type Customer,
   type CustomerFilters,
   type CustomerFormValues,
   type CustomerKpis,
   type CustomerPersonType,
-  type CustomerRank,
   type CustomerStatus,
 } from "@/lib/customers";
 
@@ -48,12 +47,6 @@ function normalizeStatus(value: string): CustomerStatus {
     : "ATIVO";
 }
 
-function normalizeRank(value?: string | null): CustomerRank | null {
-  return CUSTOMER_RANKS.includes(value as CustomerRank)
-    ? (value as CustomerRank)
-    : null;
-}
-
 function normalizeCustomer(values: CustomerFormValues) {
   return {
     person_type: normalizePersonType(values.person_type),
@@ -72,7 +65,6 @@ function normalizeCustomer(values: CustomerFormValues) {
     municipal_registration: toNullableText(values.municipal_registration),
     city_code: toNullableText(values.city_code),
     status: normalizeStatus(values.status),
-    rank: normalizeRank(values.rank),
   };
 }
 
@@ -84,8 +76,14 @@ function validateCustomer(values: ReturnType<typeof normalizeCustomer>) {
   const expectedDocumentLength = values.person_type === "PF" ? 11 : 14;
   if (values.cpf_cnpj.length !== expectedDocumentLength) {
     return values.person_type === "PF"
-      ? "Informe um CPF com 11 dígitos."
-      : "Informe um CNPJ com 14 dígitos.";
+      ? "Informe um CPF com 11 digitos."
+      : "Informe um CNPJ com 14 digitos.";
+  }
+
+  if (!isValidCustomerDocument(values.person_type, values.cpf_cnpj)) {
+    return values.person_type === "PF"
+      ? "Informe um CPF valido."
+      : "Informe um CNPJ valido.";
   }
 
   if (values.state.length !== 2) {
@@ -95,9 +93,36 @@ function validateCustomer(values: ReturnType<typeof normalizeCustomer>) {
   return null;
 }
 
+function customerDatabaseError(message: string) {
+  if (message.includes("customers_email_format_chk")) {
+    return "Informe um e-mail valido.";
+  }
+
+  if (
+    message.includes("customers_email_key")
+    || message.includes("idx_customers_active_email_unique")
+    || message.toLowerCase().includes("email")
+  ) {
+    return "Ja existe um cliente ativo com este e-mail.";
+  }
+
+  if (
+    message.includes("customers_cpf_cnpj_key")
+    || message.includes("idx_customers_active_cpf_cnpj_unique")
+    || message.toLowerCase().includes("cpf_cnpj")
+  ) {
+    return "Ja existe um cliente ativo com este CPF/CNPJ.";
+  }
+
+  return message;
+}
+
 export async function listCustomersAction(
   filters: CustomerFilters = {},
 ): Promise<ActionResult<Customer[]>> {
+  const allowed = await checkPermission("customers:view");
+  if (!allowed) return { success: false, error: "Voce nao tem permissao para visualizar clientes." };
+
   const supabase = await createClient();
   const page = filters.page ?? 1;
   const pageSize = filters.pageSize ?? 10;
@@ -142,6 +167,9 @@ export async function listCustomersAction(
 }
 
 export async function getCustomerKpisAction(): Promise<ActionResult<CustomerKpis>> {
+  const allowed = await checkPermission("customers:view");
+  if (!allowed) return { success: false, error: "Voce nao tem permissao para visualizar clientes." };
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("customers")
@@ -166,14 +194,14 @@ export async function createCustomerAction(
   values: CustomerFormValues,
 ): Promise<ActionResult<Customer>> {
   const allowed = await checkPermission("customers:create");
-  if (!allowed) return { success: false, error: "Você não tem permissão para criar clientes." };
+  if (!allowed) return { success: false, error: "Voce nao tem permissao para criar clientes." };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { success: false, error: "Usuário não autenticado." };
+  if (!user) return { success: false, error: "Usuario nao autenticado." };
 
   const payload = normalizeCustomer(values);
   const validationError = validateCustomer(payload);
@@ -185,13 +213,11 @@ export async function createCustomerAction(
       ...payload,
       created_by: user.id,
       updated_by: user.id,
-      ranked_by: payload.rank ? user.id : null,
-      ranked_at: payload.rank ? new Date().toISOString() : null,
     })
     .select()
     .single();
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: customerDatabaseError(error.message) };
 
   revalidatePath("/clientes");
   return { success: true, data: mapCustomer(data as unknown as Record<string, unknown>) };
@@ -202,14 +228,14 @@ export async function updateCustomerAction(
   values: CustomerFormValues,
 ): Promise<ActionResult<Customer>> {
   const allowed = await checkPermission("customers:update");
-  if (!allowed) return { success: false, error: "Você não tem permissão para editar clientes." };
+  if (!allowed) return { success: false, error: "Voce nao tem permissao para editar clientes." };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { success: false, error: "Usuário não autenticado." };
+  if (!user) return { success: false, error: "Usuario nao autenticado." };
 
   const payload = normalizeCustomer(values);
   const validationError = validateCustomer(payload);
@@ -221,15 +247,13 @@ export async function updateCustomerAction(
       ...payload,
       updated_by: user.id,
       updated_at: new Date().toISOString(),
-      ranked_by: payload.rank ? user.id : null,
-      ranked_at: payload.rank ? new Date().toISOString() : null,
     })
     .eq("id", id)
     .eq("is_deleted", false)
     .select()
     .single();
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: customerDatabaseError(error.message) };
 
   revalidatePath("/clientes");
   return { success: true, data: mapCustomer(data as unknown as Record<string, unknown>) };
@@ -237,16 +261,21 @@ export async function updateCustomerAction(
 
 export async function deleteCustomerAction(id: number) {
   const allowed = await checkPermission("customers:delete");
-  if (!allowed) return { success: false, error: "Você não tem permissão para excluir clientes." };
+  if (!allowed) return { success: false, error: "Voce nao tem permissao para excluir clientes." };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { success: false, error: "Usuário não autenticado." };
+  if (!user) return { success: false, error: "Usuario nao autenticado." };
 
-  const { error } = await supabase
+  const { supabase: admin, error: adminError } = await createAdminClient();
+  if (adminError || !admin) {
+    return { success: false, error: "Cliente administrativo do Supabase nao configurado." };
+  }
+
+  const { error } = await admin
     .from("customers")
     .update({
       is_deleted: true,

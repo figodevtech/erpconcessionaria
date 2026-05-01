@@ -38,7 +38,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { formatFileSize } from "@/lib/documents";
+import { formatCpfCnpj } from "@/lib/customers";
 import { formatCurrency } from "@/lib/utils";
 import {
   paymentMethodLabel,
@@ -94,8 +96,10 @@ export function TransactionTable({
   }
 
   return (
-    <div className="w-full overflow-hidden rounded-md border bg-background">
-      <Table className="text-xs">
+    <div className="w-full">
+      <ScrollArea className="w-full">
+        <div className="min-w-full rounded-md border bg-background">
+          <Table className="min-w-[1200px] text-xs">
         <TableHeader>
           <TableRow>
             <TableHead>Descrição</TableHead>
@@ -130,7 +134,7 @@ export function TransactionTable({
                       )}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
-                      {transaction.nome_pagador}
+                      {transaction.customer?.name || transaction.nome_pagador}
                     </div>
                   </TableCell>
                   {!compact && (
@@ -189,7 +193,7 @@ export function TransactionTable({
                             onClick={() => openAttachment(attachment.id)}
                           >
                             <Download className="mr-2 h-4 w-4" />
-                            Abrir comprovante
+                            Anexo
                           </DropdownMenuItem>
                         )}
                         {canDelete ? (
@@ -212,6 +216,9 @@ export function TransactionTable({
           )}
         </TableBody>
       </Table>
+      </div>
+      <ScrollBar orientation="horizontal" />
+      </ScrollArea>
 
       <TransactionDetailsDialog
         transaction={detailsTransaction}
@@ -290,7 +297,8 @@ function TransactionDetailsDialog({
           <DetailItem label="Banco / Conta" value={transaction.bank_account?.titulo || "-"} />
           <DetailItem label="Veículo" value={vehicleLabel} />
           <DetailItem label="Nome do pagador" value={transaction.nome_pagador} />
-          <DetailItem label="CPF/CNPJ do pagador" value={transaction.cpf_cnpj_pagador} />
+          <DetailItem label="Cliente vinculado" value={transaction.customer?.name || "-"} />
+          <DetailItem label="CPF/CNPJ do pagador" value={formatCpfCnpj(transaction.customer?.cpf_cnpj || transaction.cpf_cnpj_pagador)} />
           <DetailItem label="Valor liquido" value={transaction.valor_liquido == null ? "-" : formatCurrency(transaction.valor_liquido)} />
           <DetailItem label="Criada em" value={new Date(transaction.created_at).toLocaleString("pt-BR")} />
         </div>
@@ -310,7 +318,7 @@ function TransactionDetailsDialog({
               </div>
               <Button type="button" variant="outline" size="sm" onClick={() => onOpenAttachment(attachment.id)}>
                 <Download className="mr-2 h-4 w-4" />
-                Abrir comprovante
+                Anexo
               </Button>
             </div>
           ) : (

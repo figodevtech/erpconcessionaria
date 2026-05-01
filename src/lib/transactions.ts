@@ -25,6 +25,7 @@ export type Transaction = {
   tipo: TransactionType;
   vehicle_id: number | null;
   venda_id: number | null;
+  customer_id: number | null;
   categoria_id: number | null;
   banco_id: number | null;
   payment_method_id: number | null;
@@ -40,6 +41,12 @@ export type Transaction = {
     brand: string | null;
     model: string | null;
     plate: string | null;
+  } | null;
+  customer?: {
+    id: number;
+    name: string;
+    cpf_cnpj: string;
+    email: string;
   } | null;
   category?: {
     id: number;
@@ -81,6 +88,7 @@ export type TransactionFormValues = {
   tipo: TransactionType;
   vehicle_id?: string;
   venda_id?: string;
+  customer_id?: string;
   categoria_id?: string;
   banco_id?: string;
   payment_method_id?: string;
