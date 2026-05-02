@@ -80,6 +80,17 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
   const [customerSearch, setCustomerSearch] = useState("")
   const [sellerSearch, setSellerSearch] = useState("")
 
+  const filteredCustomers = customers.filter(c => 
+    !customerSearch || 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+    (c.cpf_cnpj && c.cpf_cnpj.includes(customerSearch))
+  )
+
+  const filteredSellers = sellers.filter(s => 
+    !sellerSearch || 
+    s.name.toLowerCase().includes(sellerSearch.toLowerCase())
+  )
+
   const isSoldOrInPayment = vehicle.status === "Vendido" || vehicle.status === "Pagamento"
 
   const form = useForm({
@@ -406,14 +417,14 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
                     <ComboboxContent>
                       <ComboboxEmpty>Nenhum cliente encontrado.</ComboboxEmpty>
                       <ComboboxList>
-                        {(customer: any) => (
+                        {filteredCustomers.map((customer: any) => (
                           <ComboboxItem key={customer.id} value={customer.id.toString()}>
                             <div className="flex flex-col">
                               <span>{customer.name}</span>
                               <span className="text-xs text-muted-foreground">{customer.cpf_cnpj}</span>
                             </div>
                           </ComboboxItem>
-                        )}
+                        ))}
                       </ComboboxList>
                     </ComboboxContent>
                   </Combobox>
@@ -445,11 +456,11 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
                     <ComboboxContent>
                       <ComboboxEmpty>Nenhum vendedor encontrado.</ComboboxEmpty>
                       <ComboboxList>
-                        {(seller: any) => (
+                        {filteredSellers.map((seller: any) => (
                           <ComboboxItem key={seller.id} value={seller.id.toString()}>
                             {seller.name}
                           </ComboboxItem>
-                        )}
+                        ))}
                       </ComboboxList>
                     </ComboboxContent>
                   </Combobox>

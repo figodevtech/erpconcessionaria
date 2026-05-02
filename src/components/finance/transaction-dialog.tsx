@@ -100,6 +100,12 @@ export function TransactionDialog({
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [customerSearch, setCustomerSearch] = useState("");
 
+  const filteredCustomers = customers.filter(c => 
+    !customerSearch || 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+    (c.cpf_cnpj && c.cpf_cnpj.includes(customerSearch))
+  );
+
   const form = useForm<TransactionFormValues>({
     defaultValues: {
       descricao: "",
@@ -528,14 +534,14 @@ export function TransactionDialog({
                             <ComboboxItem value="none" className="text-muted-foreground italic">
                               Não vincular cliente
                             </ComboboxItem>
-                            {(customer: any) => (
+                            {filteredCustomers.map((customer: any) => (
                               <ComboboxItem key={customer.id} value={customer.id.toString()}>
                                 <div className="flex flex-col">
                                   <span>{customer.name}</span>
                                   <span className="text-xs text-muted-foreground">{formatCpfCnpj(customer.cpf_cnpj)}</span>
                                 </div>
                               </ComboboxItem>
-                            )}
+                            ))}
                           </ComboboxList>
                         </ComboboxContent>
                       </Combobox>
