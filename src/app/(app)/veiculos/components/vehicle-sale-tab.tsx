@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Vehicle } from "./vehicle-list-client"
 import { getVehicleSaleAction, registerVehicleSaleAction, cancelVehicleSaleAction } from "@/actions/sales"
 import { listUsersAction } from "@/actions/users"
+import { getTypeCatalogAction } from "@/actions/type-catalog"
 import { formatCurrency, parseCurrency } from "@/lib/utils"
 import { TransactionDialog } from "@/components/finance/transaction-dialog"
 import { TransactionTable } from "@/components/finance/transaction-table"
@@ -39,6 +40,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 
 // Needs to match the actual customers action, but for now we'll do a simple fetch
 // since there's no listCustomersAction exported the same way, we can use supabase client
@@ -60,9 +71,14 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
 
   const [customers, setCustomers] = useState<any[]>([])
   const [sellers, setSellers] = useState<any[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([])
 
   const [cancelPending, startCancelTransition] = useTransition()
+  const [shouldDeleteTransactions, setShouldDeleteTransactions] = useState(true)
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false)
+  
+  const [customerSearch, setCustomerSearch] = useState("")
+  const [sellerSearch, setSellerSearch] = useState("")
 
   const isSoldOrInPayment = vehicle.status === "Vendido" || vehicle.status === "Pagamento"
 
@@ -94,7 +110,7 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
     } else if (discountType === "PERCENTUAL") {
       total = subTotal - (subTotal * (discountValue / 100))
     }
-    
+
     // update total_value without triggering infinite loop
     if (total !== Number(form.getValues("total_value") || 0)) {
       form.setValue("total_value", total)
@@ -131,6 +147,12 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
         const usersResult = await listUsersAction({ pageSize: 100 })
         if (usersResult.success) {
           setSellers(usersResult.data || [])
+        }
+
+        // 3. Fetch Payment Methods
+        const catalogResult = await getTypeCatalogAction()
+        if (catalogResult.success && catalogResult.data) {
+          setPaymentMethods(catalogResult.data.paymentMethods.filter((p: any) => p.ativo))
         }
 
         // 3. Fetch Sale if already sold
@@ -196,15 +218,15 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
             </div>
             <div>
               <h3 className="text-xl font-semibold text-primary">
-                {saleData.status === 'PENDENTE' 
-                  ? (saleData.total_paid > 0 ? "Pagamento Parcial Realizado" : "Venda Aguardando Pagamento") 
+                {saleData.status === 'PENDENTE'
+                  ? (saleData.total_paid > 0 ? "Pagamento Parcial Realizado" : "Venda Aguardando Pagamento")
                   : "Veículo Vendido"}
               </h3>
               <p className="text-sm text-muted-foreground">
                 {saleData.status === 'PENDENTE'
-                  ? (saleData.total_paid > 0 
-                      ? `Recebemos ${formatCurrency(saleData.total_paid)}. Aguardando o saldo de ${formatCurrency(saleData.total_value - saleData.total_paid)}.`
-                      : "Esta venda foi registrada, mas nenhum pagamento foi confirmado ainda.")
+                  ? (saleData.total_paid > 0
+                    ? `Recebemos ${formatCurrency(saleData.total_paid)}. Aguardando o saldo de ${formatCurrency(saleData.total_value - saleData.total_paid)}.`
+                    : "Esta venda foi registrada, mas nenhum pagamento foi confirmado ainda.")
                   : "Esta venda foi registrada no sistema e 100% concluída."}
               </p>
             </div>
@@ -269,14 +291,29 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Esta ação cancelará a venda do veículo e o retornará para o estoque. O histórico será mantido como cancelado.
+                    Esta ação cancelará a venda do veículo e o retornará para o estoque. O histórico da venda será mantido como cancelado.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+
+                <div className="flex items-center space-x-2 py-4">
+                  <Checkbox
+                    id="delete-transactions"
+                    checked={shouldDeleteTransactions}
+                    onCheckedChange={(checked) => setShouldDeleteTransactions(!!checked)}
+                  />
+                  <Label
+                    htmlFor="delete-transactions"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Excluir todas as transações de pagamento desta venda
+                  </Label>
+                </div>
+
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Voltar</AlertDialogCancel>
+                  <AlertDialogCancel className="mr-2">Voltar</AlertDialogCancel>
                   <AlertDialogAction onClick={() => {
                     startCancelTransition(async () => {
-                      const result = await cancelVehicleSaleAction(saleData.id, Number(vehicle.id))
+                      const result = await cancelVehicleSaleAction(saleData.id, Number(vehicle.id), shouldDeleteTransactions)
                       if (result.success) {
                         toast.success("Venda cancelada com sucesso!")
                         setSaleData(null)
@@ -308,9 +345,9 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
             </h4>
           </div>
           <div className="p-0">
-            <TransactionTable 
-              transactions={saleData.transactions || []} 
-              loading={loading} 
+            <TransactionTable
+              transactions={saleData.transactions || []}
+              loading={loading}
               onChanged={(v) => onSuccess(v)}
               compact
             />
@@ -350,26 +387,36 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
               control={form.control}
               name="customer_id"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Cliente</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
+                  <Combobox
+                    items={customers}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    inputValue={customerSearch}
+                    onInputValueChange={setCustomerSearch}
+                    disabled={isPending || loading}
+                  >
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o cliente comprador">
-                          {field.value && customers.length > 0
-                            ? customers.find((c) => c.id.toString() === field.value)?.name || field.value
-                            : "Selecione o cliente comprador"}
-                        </SelectValue>
-                      </SelectTrigger>
+                      <ComboboxInput
+                        placeholder="Pesquisar cliente por nome ou CPF/CNPJ..."
+                        className="w-full bg-background/50"
+                      />
                     </FormControl>
-                    <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-[var(--radix-select-trigger-width)]">
-                      {customers.map((c) => (
-                        <SelectItem key={c.id} value={c.id.toString()}>
-                          {c.name} ({c.cpf_cnpj})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <ComboboxContent>
+                      <ComboboxEmpty>Nenhum cliente encontrado.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(customer: any) => (
+                          <ComboboxItem key={customer.id} value={customer.id.toString()}>
+                            <div className="flex flex-col">
+                              <span>{customer.name}</span>
+                              <span className="text-xs text-muted-foreground">{customer.cpf_cnpj}</span>
+                            </div>
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
                   <FormMessage />
                 </FormItem>
               )}
@@ -379,26 +426,33 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
               control={form.control}
               name="seller_id"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Vendedor</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
+                  <Combobox
+                    items={sellers}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    inputValue={sellerSearch}
+                    onInputValueChange={setSellerSearch}
+                    disabled={isPending || loading}
+                  >
                     <FormControl>
-                      <SelectTrigger >
-                        <SelectValue placeholder="Selecione o vendedor">
-                          {field.value && sellers.length > 0
-                            ? sellers.find((s) => s.id.toString() === field.value)?.name || field.value
-                            : "Selecione o vendedor"}
-                        </SelectValue>
-                      </SelectTrigger>
+                      <ComboboxInput
+                        placeholder="Pesquisar vendedor..."
+                        className="w-full bg-background/50"
+                      />
                     </FormControl>
-                    <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-[var(--radix-select-trigger-width)]">
-                      {sellers.map((s) => (
-                        <SelectItem key={s.id} value={s.id.toString()}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <ComboboxContent>
+                      <ComboboxEmpty>Nenhum vendedor encontrado.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(seller: any) => (
+                          <ComboboxItem key={seller.id} value={seller.id.toString()}>
+                            {seller.name}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
                   <FormMessage />
                 </FormItem>
               )}
@@ -537,9 +591,20 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Método de Pagamento</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Financiamento BV, PIX, TED..." {...field} disabled={isPending} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o método de pagamento" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent alignItemWithTrigger={false}>
+                      {paymentMethods.map((p) => (
+                        <SelectItem key={p.id} value={p.nome}>
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

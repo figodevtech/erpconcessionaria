@@ -48,12 +48,12 @@ export async function GET(request: Request) {
     const totalPages = count ? Math.ceil(count / limit) : 0;
 
     const vehicleIds = (data ?? []).map((vehicle) => vehicle.id).filter(Boolean);
-    const financeByVehicle = new Map<number, { receitas: number; despesas: number }>();
+    const financeByVehicle = new Map<number, { receitas: number; despesas: number; receitasVenda: number; despesasVenda: number }>();
 
     if (vehicleIds.length > 0) {
       const { data: transactions, error: transactionsError } = await supabase
         .from("transactions")
-        .select("vehicle_id, tipo, valor")
+        .select("vehicle_id, tipo, valor, venda_id")
         .in("vehicle_id", vehicleIds)
         .eq("is_deleted", false);
 
@@ -64,15 +64,17 @@ export async function GET(request: Request) {
           const vehicleId = Number(transaction.vehicle_id);
           if (!vehicleId) return;
 
-          const current = financeByVehicle.get(vehicleId) ?? { receitas: 0, despesas: 0 };
+          const current = financeByVehicle.get(vehicleId) ?? { receitas: 0, despesas: 0, receitasVenda: 0, despesasVenda: 0 };
           const value = Number(transaction.valor ?? 0);
 
           if (transaction.tipo === "RECEITA") {
             current.receitas += value;
+            if (transaction.venda_id) current.receitasVenda += value;
           }
 
           if (transaction.tipo === "DESPESA") {
             current.despesas += value;
+            if (transaction.venda_id) current.despesasVenda += value;
           }
 
           financeByVehicle.set(vehicleId, current);
@@ -87,17 +89,21 @@ export async function GET(request: Request) {
         sortedImages = [...sortedImages].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
       }
 
-      const finance = financeByVehicle.get(Number(vehicle.id)) ?? { receitas: 0, despesas: 0 };
+      const finance = financeByVehicle.get(Number(vehicle.id)) ?? { receitas: 0, despesas: 0, receitasVenda: 0, despesasVenda: 0 };
       const purchasePrice = Number(vehicle.purchase_price ?? 0);
       const salePrice = Number(vehicle.price ?? 0);
-      const currentCost = purchasePrice + finance.despesas - finance.receitas;
+      
+      const operationalRevenues = finance.receitas - finance.receitasVenda;
+      const operationalExpenses = finance.despesas - finance.despesasVenda;
+      
+      const currentCost = purchasePrice + operationalExpenses - operationalRevenues;
       const profit = salePrice - currentCost;
 
       return {
         ...vehicle,
         vehicle_images: sortedImages,
-        total_receitas: finance.receitas,
-        total_despesas: finance.despesas,
+        total_receitas: operationalRevenues,
+        total_despesas: operationalExpenses,
         lucro: profit,
         lucro_percentual: currentCost > 0 ? (profit / currentCost) * 100 : 0,
       };

@@ -45,6 +45,14 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { formatFileSize } from "@/lib/documents";
 import { formatCpfCnpj, type Customer } from "@/lib/customers";
 import {
@@ -90,6 +98,7 @@ export function TransactionDialog({
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [attachment, setAttachment] = useState<File | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
 
   const form = useForm<TransactionFormValues>({
     defaultValues: {
@@ -486,10 +495,11 @@ export function TransactionDialog({
                   control={form.control}
                   name="customer_id"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-3">
+                    <FormItem className="md:col-span-3 flex flex-col">
                       <FormLabel>Cliente cadastrado</FormLabel>
-                      <Select
-                        value={field.value || "none"}
+                      <Combobox
+                        items={customers}
+                        value={field.value}
                         onValueChange={(value) => {
                           const nextValue = value === "none" ? "" : value;
                           field.onChange(nextValue);
@@ -497,29 +507,38 @@ export function TransactionDialog({
                           if (customer) {
                             form.setValue("nome_pagador", customer.name);
                             form.setValue("cpf_cnpj_pagador", formatCpfCnpj(customer.cpf_cnpj));
+                          } else if (value === "none") {
+                            form.setValue("nome_pagador", "");
+                            form.setValue("cpf_cnpj_pagador", "");
                           }
                         }}
+                        inputValue={customerSearch}
+                        onInputValueChange={setCustomerSearch}
                         disabled={isPending}
                       >
                         <FormControl>
-                          <SelectTrigger className="w-full">
-                            <UserRound className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span className="truncate text-left">
-                              {selectedCustomer
-                                ? `${selectedCustomer.name} - ${formatCpfCnpj(selectedCustomer.cpf_cnpj)}`
-                                : "Nao vincular cliente"}
-                            </span>
-                          </SelectTrigger>
+                          <ComboboxInput
+                            placeholder="Pesquisar cliente por nome ou CPF/CNPJ..."
+                            className="w-full bg-background/50"
+                          />
                         </FormControl>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectItem value="none">Nao vincular cliente</SelectItem>
-                          {customers.map((customer) => (
-                            <SelectItem key={customer.id} value={customer.id.toString()}>
-                              {customer.name} - {formatCpfCnpj(customer.cpf_cnpj)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <ComboboxContent>
+                          <ComboboxEmpty>Nenhum cliente encontrado.</ComboboxEmpty>
+                          <ComboboxList>
+                            <ComboboxItem value="none" className="text-muted-foreground italic">
+                              Não vincular cliente
+                            </ComboboxItem>
+                            {(customer: any) => (
+                              <ComboboxItem key={customer.id} value={customer.id.toString()}>
+                                <div className="flex flex-col">
+                                  <span>{customer.name}</span>
+                                  <span className="text-xs text-muted-foreground">{formatCpfCnpj(customer.cpf_cnpj)}</span>
+                                </div>
+                              </ComboboxItem>
+                            )}
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
                       <FormMessage />
                     </FormItem>
                   )}

@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/utils/supabase/server"
+import { createAdminClient, createClient } from "@/utils/supabase/server"
 
 export async function getVehicleSaleAction(vehicleId: number) {
   const supabase = await createClient()
@@ -106,7 +106,7 @@ export async function registerVehicleSaleAction(formData: FormData) {
   return { success: true, data: sale, vehicle: updatedVehicle || null }
 }
 
-export async function cancelVehicleSaleAction(saleId: number, vehicleId: number) {
+export async function cancelVehicleSaleAction(saleId: number, vehicleId: number, deleteTransactions: boolean = false) {
   const supabase = await createClient()
 
   // Authenticate user
@@ -115,8 +115,13 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number)
     return { success: false, error: "Usuário não autenticado." }
   }
 
+  const { supabase: admin, error: adminError } = await createAdminClient();
+  if (adminError || !admin) {
+    return { success: false, error: "Erro ao configurar cliente administrativo." }
+  }
+
   // 1. Update sale to CANCELADA and record who canceled
-  const { error: saleError } = await supabase
+  const { error: saleError } = await admin
     .from("sales")
     .update({ 
       status: 'CANCELADA',
@@ -129,8 +134,58 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number)
     return { success: false, error: "Erro ao cancelar venda: " + saleError.message }
   }
 
-  // 2. Update vehicle back to 'Em venda'
-  const { error: vehicleError } = await supabase
+  // 2. Optional: Delete associated transactions
+  if (deleteTransactions) {
+    const { data: transactions } = await admin
+      .from("transactions")
+      .select("id")
+      .eq("venda_id", saleId)
+      .eq("is_deleted", false)
+
+    if (transactions && transactions.length > 0) {
+      const txIds = transactions.map(t => t.id)
+
+      // Fetch and remove attachments
+      const { data: attachments } = await admin
+        .from("transaction_attachments")
+        .select("file_path")
+        .in("transaction_id", txIds)
+        .eq("is_deleted", false)
+
+      if (attachments && attachments.length > 0) {
+        const paths = attachments.map(a => a.file_path).filter(Boolean)
+        if (paths.length > 0) {
+          await admin.storage.from("transaction-attachments").remove(paths)
+        }
+
+        await admin
+          .from("transaction_attachments")
+          .update({
+            is_deleted: true,
+            deleted_at: new Date().toISOString(),
+            deleted_by: user.id,
+            updated_by: user.id,
+            updated_at: new Date().toISOString(),
+          })
+          .in("transaction_id", txIds)
+      }
+
+      // Mark transactions as deleted
+      await admin
+        .from("transactions")
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+          deleted_by: user.id,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", txIds)
+    }
+  }
+
+  // 3. Update vehicle back to 'Em venda'
+  const { error: vehicleError } = await admin
     .from("vehicles")
     .update({ status: 'Em venda' })
     .eq("id", vehicleId)
@@ -139,8 +194,8 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number)
     return { success: false, error: "Venda cancelada, mas erro ao atualizar status do veículo: " + vehicleError.message }
   }
 
-  // 3. Fetch updated vehicle
-  const { data: updatedVehicle, error: fetchError } = await supabase
+  // 4. Fetch updated vehicle
+  const { data: updatedVehicle } = await admin
     .from("vehicles")
     .select("*")
     .eq("id", vehicleId)
@@ -148,6 +203,7 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number)
 
   revalidatePath("/veiculos")
   revalidatePath("/dashboard")
+  revalidatePath("/financeiro")
   
   return { success: true, vehicle: updatedVehicle || null }
 }

@@ -109,6 +109,8 @@ export type TransactionFilters = {
 export type TransactionKpis = {
   totalReceitas: number;
   totalDespesas: number;
+  totalReceitasVenda: number;
+  totalDespesasVenda: number;
   saldo: number;
   pendentes: number;
 };

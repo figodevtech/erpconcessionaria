@@ -170,7 +170,7 @@ export async function getTransactionKpisAction(
 
   let query = supabase
     .from("transactions")
-    .select("tipo, valor, pendente")
+    .select("tipo, valor, pendente, venda_id")
     .eq("is_deleted", false);
 
   if (vehicleId) {
@@ -187,6 +187,15 @@ export async function getTransactionKpisAction(
   const totalDespesas = rows
     .filter((row) => row.tipo === "DESPESA")
     .reduce((acc, row) => acc + Number(row.valor ?? 0), 0);
+  
+  const totalReceitasVenda = rows
+    .filter((row) => row.tipo === "RECEITA" && row.venda_id !== null)
+    .reduce((acc, row) => acc + Number(row.valor ?? 0), 0);
+  
+  const totalDespesasVenda = rows
+    .filter((row) => row.tipo === "DESPESA" && row.venda_id !== null)
+    .reduce((acc, row) => acc + Number(row.valor ?? 0), 0);
+
   const pendentes = rows.filter((row) => row.pendente).length;
 
   return {
@@ -194,6 +203,8 @@ export async function getTransactionKpisAction(
     data: {
       totalReceitas,
       totalDespesas,
+      totalReceitasVenda,
+      totalDespesasVenda,
       saldo: totalReceitas - totalDespesas,
       pendentes,
     },
@@ -491,9 +502,16 @@ export async function softDeleteTransactionAction(id: number) {
     }
   }
 
+  // Fetch updated vehicle if related to a sale or specifically requested
+  let updatedVehicle = null;
+  if (tx?.vehicle_id) {
+    const { data: v } = await admin.from("vehicles").select("*").eq("id", tx.vehicle_id).single();
+    updatedVehicle = v;
+  }
+
   revalidatePath("/financeiro");
   revalidatePath("/veiculos");
-  return { success: true };
+  return { success: true, vehicle: updatedVehicle };
 }
 
 export async function getTransactionAttachmentUrlAction(id: number): Promise<ActionResult<string>> {

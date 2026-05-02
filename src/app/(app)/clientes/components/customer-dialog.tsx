@@ -98,6 +98,7 @@ export function CustomerDialog({
   const { hasPermission } = usePermissions();
   const [isPending, startTransition] = useTransition();
   const [isLookingUpZip, startZipLookup] = useTransition();
+  const [isLookingUpCnpj, startCnpjLookup] = useTransition();
   const isEditing = !!customer;
   const canSave = hasPermission(isEditing ? "customers:update" : "customers:create");
 
@@ -160,6 +161,41 @@ export function CustomerDialog({
         form.setValue("city_code", data.ibge || "");
       } catch {
         toast.error("Não foi possível consultar o CEP.");
+      }
+    });
+  }
+
+  function lookupCnpj() {
+    const cnpj = onlyDigits(form.getValues("cpf_cnpj") || "");
+    if (cnpj.length !== 14) {
+      toast.error("Informe um CNPJ válido com 14 dígitos.");
+      return;
+    }
+
+    startCnpjLookup(async () => {
+      try {
+        const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          toast.error("CNPJ não encontrado ou erro na consulta.");
+          return;
+        }
+
+        form.setValue("name", data.razao_social || "");
+        form.setValue("email", data.email || "");
+        form.setValue("phone", data.ddd_telefone_1 || "");
+        form.setValue("zip_code", data.cep || "");
+        form.setValue("address", data.logradouro || "");
+        form.setValue("address_number", data.numero || "");
+        form.setValue("address_complement", data.complemento || "");
+        form.setValue("neighborhood", data.bairro || "");
+        form.setValue("city", data.municipio || "");
+        form.setValue("state", data.uf || "");
+        
+        toast.success("Dados do CNPJ carregados com sucesso.");
+      } catch {
+        toast.error("Não foi possível consultar o CNPJ.");
       }
     });
   }
@@ -269,8 +305,16 @@ export function CustomerDialog({
                           <Select
                             value={field.value}
                             onValueChange={(value) => {
-                              field.onChange(value as CustomerPersonType);
-                              form.setValue("cpf_cnpj", "");
+                              const newType = value as CustomerPersonType;
+                              field.onChange(newType);
+                              
+                              // Esvazia todos os campos ao mudar o tipo (mantendo apenas o tipo e o status atual)
+                              const currentStatus = form.getValues("status");
+                              form.reset({
+                                ...defaultValues,
+                                person_type: newType,
+                                status: currentStatus,
+                              });
                             }}
                             disabled={isPending || !canSave}
                           >
@@ -304,6 +348,8 @@ export function CustomerDialog({
                       valueParser={(value) =>
                         onlyDigits(value).slice(0, personType === "PF" ? 11 : 14)
                       }
+                      onLookup={personType === "PJ" ? lookupCnpj : undefined}
+                      isLookingUp={isLookingUpCnpj}
                     />
 
                     {/* Status */}
@@ -642,6 +688,8 @@ function MaskedInput({
   placeholder,
   valueFormatter,
   valueParser,
+  onLookup,
+  isLookingUp,
 }: {
   control: Control<CustomerFormValues>;
   name: keyof CustomerFormValues;
@@ -652,6 +700,8 @@ function MaskedInput({
   placeholder?: string;
   valueFormatter: (value: string) => string;
   valueParser: (value: string) => string;
+  onLookup?: () => void;
+  isLookingUp?: boolean;
 }) {
   return (
     <FormField
@@ -666,13 +716,27 @@ function MaskedInput({
             <div className="relative">
               <Icon className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
               <Input
-                className="h-10 border-white/8 bg-white/4 pl-9 text-zinc-100 placeholder:text-zinc-600 transition-colors focus-visible:border-white/20 focus-visible:ring-white/10 hover:bg-white/6"
+                className={`h-10 border-white/8 bg-white/4 pl-9 text-zinc-100 placeholder:text-zinc-600 transition-colors focus-visible:border-white/20 focus-visible:ring-white/10 hover:bg-white/6 ${onLookup ? "pr-10" : ""}`}
                 placeholder={placeholder}
                 value={valueFormatter((field.value as string) || "")}
                 onChange={(e) => field.onChange(valueParser(e.target.value))}
-                disabled={disabled}
+                disabled={disabled || isLookingUp}
                 required={required}
               />
+              {onLookup && (
+                <button
+                  type="button"
+                  onClick={onLookup}
+                  disabled={disabled || isLookingUp}
+                  className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-r-md text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200 disabled:opacity-40"
+                >
+                  {isLookingUp ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </button>
+              )}
             </div>
           </FormControl>
           <FormMessage />

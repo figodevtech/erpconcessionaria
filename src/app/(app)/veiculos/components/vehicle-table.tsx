@@ -121,8 +121,8 @@ export function VehicleTable({
                 <TableHead className="text-center">Ano</TableHead>
                 <TableHead className="text-center">Placa</TableHead>
                 <TableHead className="text-right">Valor Compra</TableHead>
-                <TableHead className="text-right">Receitas</TableHead>
-                <TableHead className="text-right">Despesas</TableHead>
+                <TableHead className="text-right">Receitas Ops.</TableHead>
+                <TableHead className="text-right">Despesas Ops.</TableHead>
                 <TableHead className="text-right">Valor Venda</TableHead>
                 <TableHead className="text-right">Lucro</TableHead>
                 <TableHead className="text-right">% Lucro</TableHead>

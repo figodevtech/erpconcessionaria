@@ -99,14 +99,14 @@ export function VehicleFinanceTab({ vehicle, onSuccess }: { vehicle: Vehicle, on
           </div>
         </CardHeader>
         <CardContent className="p-4">
-          <TransactionTable 
-            transactions={transactions} 
-            loading={loading} 
+          <TransactionTable
+            transactions={transactions}
+            loading={loading}
             onChanged={(v) => {
               fetchData();
               if (onSuccess) onSuccess(v);
-            }} 
-            compact 
+            }}
+            compact
           />
         </CardContent>
       </Card>
@@ -140,9 +140,14 @@ function VehicleFinancialKpis({
   const fipe = Number(vehicle.fipe ?? 0);
   const purchasePrice = Number(vehicle.purchase_price ?? 0);
   const salePrice = Number(vehicle.price ?? 0);
-  const expenses = Number(data.totalDespesas ?? 0);
-  const revenues = Number(data.totalReceitas ?? 0);
-  const currentCost = purchasePrice + expenses - revenues;
+  const totalExpenses = Number(data.totalDespesas ?? 0);
+  const totalRevenues = Number(data.totalReceitas ?? 0);
+  const saleExpenses = Number(data.totalDespesasVenda ?? 0);
+  const saleRevenues = Number(data.totalReceitasVenda ?? 0);
+
+  // Custo = Compra + (Despesas não-venda) - (Receitas não-venda)
+  const currentCost = purchasePrice + (totalExpenses - saleExpenses) - (totalRevenues - saleRevenues);
+
   const expectedProfit = salePrice - currentCost;
   const expectedProfitPercent = currentCost > 0 ? (expectedProfit / currentCost) * 100 : 0;
 
@@ -165,7 +170,7 @@ function VehicleFinancialKpis({
     {
       title: "CUSTO ATUAL DO CARRO",
       value: formatCurrency(currentCost),
-      hint: "Compra + despesas - receitas",
+      hint: "Compra + despesas operacionais (exclui venda)",
       icon: ReceiptText,
       className: currentCost >= 0 ? "text-amber-600" : "text-emerald-600",
     },
@@ -182,16 +187,16 @@ function VehicleFinancialKpis({
 
 
     {
-      title: "DESPESAS",
-      value: formatCurrency(expenses),
-      hint: "Registradas no financeiro",
+      title: "DESPESAS OPERACIONAIS",
+      value: formatCurrency(totalExpenses - saleExpenses),
+      hint: "Exclui comissões e gastos de venda",
       icon: ArrowDownCircle,
       className: "text-red-600",
     },
     {
-      title: "RECEITAS",
-      value: formatCurrency(revenues),
-      hint: "Registradas no financeiro",
+      title: "RECEITAS OPERACIONAIS",
+      value: formatCurrency(totalRevenues - saleRevenues),
+      hint: "Exclui recebimentos da venda",
       icon: ArrowUpCircle,
       className: "text-emerald-600",
     },
