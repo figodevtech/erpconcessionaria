@@ -24,7 +24,7 @@ import { formatCurrency } from "@/lib/utils";
 import type { Transaction, TransactionKpis as TransactionKpisType } from "@/lib/transactions";
 import type { Vehicle } from "./vehicle-list-client";
 
-export function VehicleFinanceTab({ vehicle }: { vehicle: Vehicle }) {
+export function VehicleFinanceTab({ vehicle, onSuccess }: { vehicle: Vehicle, onSuccess?: (updatedVehicle?: Vehicle) => void }) {
   const { hasPermission } = usePermissions();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [kpis, setKpis] = useState<TransactionKpisType | null>(null);
@@ -99,14 +99,26 @@ export function VehicleFinanceTab({ vehicle }: { vehicle: Vehicle }) {
           </div>
         </CardHeader>
         <CardContent className="p-4">
-          <TransactionTable transactions={transactions} loading={loading} onChanged={fetchData} compact />
+          <TransactionTable 
+            transactions={transactions} 
+            loading={loading} 
+            onChanged={(v) => {
+              fetchData();
+              if (onSuccess) onSuccess(v);
+            }} 
+            compact 
+          />
         </CardContent>
       </Card>
 
       <TransactionDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSuccess={fetchData}
+        onSuccess={(v) => {
+          fetchData();
+          if (onSuccess) onSuccess(v);
+          setDialogOpen(false);
+        }}
         vehicle={{
           id: vehicle.id,
           brand: vehicle.brand,

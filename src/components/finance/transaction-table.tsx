@@ -52,7 +52,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 type TransactionTableProps = {
   transactions: Transaction[];
   loading?: boolean;
-  onChanged: () => void;
+  onChanged: (updatedVehicle?: any) => void;
   compact?: boolean;
 };
 
@@ -78,7 +78,7 @@ export function TransactionTable({
       if (result.success) {
         toast.success("Transação removida");
         setTransactionToDelete(null);
-        onChanged();
+        onChanged(result.vehicle);
       } else {
         toast.error(result.error ?? "Erro ao remover transação");
       }

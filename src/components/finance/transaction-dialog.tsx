@@ -63,8 +63,10 @@ type VehicleOption = {
 type TransactionDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (updatedVehicle?: any) => void;
   vehicle?: VehicleOption | null;
+  saleId?: number | null;
+  saleValue?: number | null;
 };
 
 function nowForInput() {
@@ -78,6 +80,8 @@ export function TransactionDialog({
   onOpenChange,
   onSuccess,
   vehicle,
+  saleId,
+  saleValue,
 }: TransactionDialogProps) {
   const [isPending, startTransition] = useTransition();
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
@@ -90,13 +94,13 @@ export function TransactionDialog({
   const form = useForm<TransactionFormValues>({
     defaultValues: {
       descricao: "",
-      valor: "",
+      valor: saleValue ? formatCurrency(saleValue) : "",
       data: nowForInput(),
       metodo_pagamento: "PIX",
       categoria: "NAO RELACIONADO",
       tipo: "RECEITA",
       vehicle_id: vehicle?.id ?? "",
-      venda_id: "",
+      venda_id: saleId ? saleId.toString() : "",
       customer_id: "",
       categoria_id: "",
       banco_id: "",
@@ -118,13 +122,13 @@ export function TransactionDialog({
 
     form.reset({
       descricao: "",
-      valor: "",
+      valor: saleValue ? formatCurrency(saleValue) : "",
       data: nowForInput(),
       metodo_pagamento: "PIX",
       categoria: "NAO RELACIONADO",
       tipo: "RECEITA",
       vehicle_id: vehicle?.id ?? "",
-      venda_id: "",
+      venda_id: saleId ? saleId.toString() : "",
       customer_id: "",
       categoria_id: "",
       banco_id: "",
@@ -141,7 +145,7 @@ export function TransactionDialog({
       }
     }, 0);
     return () => clearTimeout(timeout);
-  }, [form, open, vehicle?.id]);
+  }, [form, open, vehicle?.id, saleId, saleValue]);
 
   useEffect(() => {
     if (!open) return;
@@ -162,8 +166,19 @@ export function TransactionDialog({
           setBankAccounts(activeBanks);
           setPaymentMethods(activePayments);
 
-          form.setValue("categoria_id", activeCategories[0]?.id.toString() ?? "");
-          form.setValue("categoria", activeCategories[0]?.nome ?? "NAO RELACIONADO");
+          if (saleId) {
+            const saleCategory = activeCategories.find(c => c.nome.toUpperCase().includes("PAGAMENTO DE VENDA") || c.nome.toUpperCase().includes("VENDA"));
+            if (saleCategory) {
+              form.setValue("categoria_id", saleCategory.id.toString());
+              form.setValue("categoria", saleCategory.nome);
+            } else {
+              form.setValue("categoria", "PAGAMENTO DE VENDA");
+            }
+          } else {
+            form.setValue("categoria_id", activeCategories[0]?.id.toString() ?? "");
+            form.setValue("categoria", activeCategories[0]?.nome ?? "NAO RELACIONADO");
+          }
+
           form.setValue("banco_id", activeBanks[0]?.id.toString() ?? "");
           form.setValue("payment_method_id", activePayments[0]?.id.toString() ?? "");
           form.setValue("metodo_pagamento", activePayments[0]?.codigo ?? "PIX");
@@ -195,7 +210,7 @@ export function TransactionDialog({
       const result = await createTransactionAction(formData);
       if (result.success) {
         toast.success("Transação lançada com sucesso");
-        onSuccess();
+        onSuccess(result.vehicle);
         onOpenChange(false);
       } else {
         toast.error(result.error ?? "Erro ao criar transação");
@@ -415,7 +430,7 @@ export function TransactionDialog({
                           const selected = categories.find((item) => item.id.toString() === value);
                           form.setValue("categoria", selected?.nome ?? "NAO RELACIONADO");
                         }}
-                        disabled={isPending}
+                        disabled={isPending || !!saleId}
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">

@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
@@ -101,4 +102,5 @@ export {
   AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
+  DialogTrigger as AlertDialogTrigger,
 }

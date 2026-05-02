@@ -122,6 +122,7 @@ import { formatCurrency, parseCurrency } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
 import { VehicleFinanceTab } from "./vehicle-finance-tab";
 import { VehicleAttachmentsTab } from "./vehicle-attachments-tab";
+import { VehicleSaleTab } from "./vehicle-sale-tab";
 
 export interface VehicleFormValues {
   type: string;
@@ -634,6 +635,14 @@ export function VehicleDialog({
                   </TabsTrigger>
                   {vehicle?.id && (
                     <TabsTrigger
+                      value="Venda"
+                      className={"px-6 rounded-lg transition-all" + tabTheme}
+                    >
+                      Venda
+                    </TabsTrigger>
+                  )}
+                  {vehicle?.id && (
+                    <TabsTrigger
                       value="Financeiro"
                       className={"px-6 rounded-lg transition-all" + tabTheme}
                     >
@@ -694,10 +703,25 @@ export function VehicleDialog({
               {vehicle?.id && (
                 <TabsContent
                   className="flex-1 min-h-0 overflow-hidden p-0"
+                  value="Venda"
+                >
+                  <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
+                    <VehicleSaleTab vehicle={vehicle} onSuccess={(v) => {
+                       if (onSuccess) onSuccess(v);
+                    }} />
+                  </ScrollArea>
+                </TabsContent>
+              )}
+
+              {vehicle?.id && (
+                <TabsContent
+                  className="flex-1 min-h-0 overflow-hidden p-0"
                   value="Financeiro"
                 >
                   <ScrollArea className="h-full px-4 py-6 bg-muted-foreground/5">
-                    <VehicleFinanceTab vehicle={vehicle} />
+                    <VehicleFinanceTab vehicle={vehicle} onSuccess={(v) => {
+                       if (onSuccess) onSuccess(v);
+                    }} />
                   </ScrollArea>
                 </TabsContent>
               )}

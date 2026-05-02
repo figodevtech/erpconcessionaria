@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, User, Mail, Shield, CheckCircle2 } from "lucide-react"
+import { Loader2, User, Mail, Shield, CheckCircle2, Percent } from "lucide-react"
 import { createUserAction } from "@/actions/users"
 import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -59,6 +59,7 @@ export function UserDialog({
       email: "",
       password: "",
       profile_id: "",
+      commission_percent: "",
     },
   })
 
@@ -70,6 +71,7 @@ export function UserDialog({
           email: user.email || "",
           password: "", // Don't show password
           profile_id: user.profile_id?.toString() || "",
+          commission_percent: user.commission_percent?.toString() || "",
         })
       } else {
         form.reset({
@@ -77,6 +79,7 @@ export function UserDialog({
           email: "",
           password: "",
           profile_id: "",
+          commission_percent: "",
         })
       }
     }
@@ -185,6 +188,32 @@ export function UserDialog({
                     )}
                   />
                 )}
+
+                <FormField
+                  control={form.control}
+                  name="commission_percent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Comissão de Venda (%)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            placeholder="Ex: 5.5"
+                            className="pl-9"
+                            {...field}
+                            disabled={isPending || !canUpdate}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}

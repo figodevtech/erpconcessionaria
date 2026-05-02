@@ -18,6 +18,7 @@ const ATTACHMENTS_BUCKET = "transaction-attachments";
 type ActionResult<T> = {
   success: boolean;
   data?: T;
+  vehicle?: any;
   count?: number;
   error?: string;
 };
@@ -301,6 +302,44 @@ export async function createTransactionAction(
 
   let transaction = mapTransaction(data as unknown as Record<string, unknown>);
 
+  // If this transaction is linked to a sale, check if it's fully paid
+  if (payload.venda_id) {
+    // 1. Get total value of the sale
+    const { data: sale } = await admin
+      .from("sales")
+      .select("total_value")
+      .eq("id", payload.venda_id)
+      .single();
+
+    if (sale) {
+      // 2. Sum all transactions for this sale
+      const { data: transactions } = await admin
+        .from("transactions")
+        .select("valor")
+        .eq("venda_id", payload.venda_id)
+        .eq("is_deleted", false)
+        .eq("pendente", false); // Only count confirmed payments
+
+      const totalPaid = (transactions ?? []).reduce((acc, t) => acc + Number(t.valor), 0);
+
+      // 3. Only complete if total paid >= total sale value
+      if (totalPaid >= Number(sale.total_value)) {
+        await admin.from("sales").update({ status: 'CONCLUIDA' }).eq("id", payload.venda_id);
+        
+        if (payload.vehicle_id) {
+          await admin.from("vehicles").update({ status: 'Vendido' }).eq("id", payload.vehicle_id);
+        }
+      }
+    }
+  }
+
+  // Fetch updated vehicle if related to a sale or specifically requested
+  let updatedVehicle = null;
+  if (payload.vehicle_id) {
+    const { data: v } = await admin.from("vehicles").select("*").eq("id", payload.vehicle_id).single();
+    updatedVehicle = v;
+  }
+
   if (attachment) {
     if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(attachment.type)) {
       await admin.from("transactions").delete().eq("id", transaction.id);
@@ -357,7 +396,7 @@ export async function createTransactionAction(
   revalidatePath("/financeiro");
   revalidatePath("/veiculos");
 
-  return { success: true, data: transaction };
+  return { success: true, data: transaction, vehicle: updatedVehicle };
 }
 
 export async function softDeleteTransactionAction(id: number) {
@@ -413,6 +452,43 @@ export async function softDeleteTransactionAction(id: number) {
         updated_at: new Date().toISOString(),
       })
       .eq("transaction_id", id);
+  }
+
+  // Handle sale status reversion if transaction was linked to a sale
+  const { data: tx } = await admin
+    .from("transactions")
+    .select("venda_id, vehicle_id")
+    .eq("id", id)
+    .single();
+
+  if (tx?.venda_id) {
+    // 1. Get total value of the sale
+    const { data: sale } = await admin
+      .from("sales")
+      .select("total_value")
+      .eq("id", tx.venda_id)
+      .single();
+
+    if (sale) {
+      // 2. Sum remaining confirmed transactions
+      const { data: remainingTx } = await admin
+        .from("transactions")
+        .select("valor")
+        .eq("venda_id", tx.venda_id)
+        .eq("is_deleted", false)
+        .eq("pendente", false);
+
+      const totalPaid = (remainingTx ?? []).reduce((acc, t) => acc + Number(t.valor), 0);
+
+      // 3. If total paid is now less than sale value, revert statuses
+      if (totalPaid < Number(sale.total_value)) {
+        await admin.from("sales").update({ status: 'PENDENTE' }).eq("id", tx.venda_id);
+        
+        if (tx.vehicle_id) {
+          await admin.from("vehicles").update({ status: 'Pagamento' }).eq("id", tx.vehicle_id);
+        }
+      }
+    }
   }
 
   revalidatePath("/financeiro");

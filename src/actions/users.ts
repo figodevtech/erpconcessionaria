@@ -9,6 +9,8 @@ export async function createUserAction(formData: FormData) {
   const name = formData.get("name") as string
   const profile_id_raw = formData.get("profile_id") as string
   const profile_id = parseInt(profile_id_raw)
+  const commission_raw = formData.get("commission_percent") as string | null
+  const commission_percent = commission_raw ? parseFloat(commission_raw) : null
 
   if (isNaN(profile_id)) {
     return { error: "O cargo (perfil) é obrigatório." }
@@ -32,7 +34,7 @@ export async function createUserAction(formData: FormData) {
 
     const { error: profileError } = await supabase
       .from("users")
-      .update({ name, profile_id })
+      .update({ name, profile_id, commission_percent })
       .eq("id", userId)
 
     if (profileError) return { error: "Database Update: " + profileError.message }
@@ -73,6 +75,7 @@ export async function createUserAction(formData: FormData) {
         email,
         name,
         profile_id,
+        commission_percent,
         active: true
       })
 
