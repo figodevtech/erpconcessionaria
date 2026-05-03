@@ -76,18 +76,18 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
   const [cancelPending, startCancelTransition] = useTransition()
   const [shouldDeleteTransactions, setShouldDeleteTransactions] = useState(true)
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false)
-  
+
   const [customerSearch, setCustomerSearch] = useState("")
   const [sellerSearch, setSellerSearch] = useState("")
 
-  const filteredCustomers = customers.filter(c => 
-    !customerSearch || 
-    c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+  const filteredCustomers = customers.filter(c =>
+    !customerSearch ||
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
     (c.cpf_cnpj && c.cpf_cnpj.includes(customerSearch))
   )
 
-  const filteredSellers = sellers.filter(s => 
-    !sellerSearch || 
+  const filteredSellers = sellers.filter(s =>
+    !sellerSearch ||
     s.name.toLowerCase().includes(sellerSearch.toLowerCase())
   )
 
@@ -402,7 +402,7 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
                   <FormLabel>Cliente</FormLabel>
                   <Combobox
                     items={customers}
-                    value={field.value}
+                    value={customers.find(c => c.id === Number(field.value))?.name || ""}
                     onValueChange={field.onChange}
                     inputValue={customerSearch}
                     onInputValueChange={setCustomerSearch}
@@ -441,7 +441,7 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
                   <FormLabel>Vendedor</FormLabel>
                   <Combobox
                     items={sellers}
-                    value={field.value}
+                    value={sellers.find(s => s.id === field.value)?.name || ""}
                     onValueChange={field.onChange}
                     inputValue={sellerSearch}
                     onInputValueChange={setSellerSearch}
@@ -507,7 +507,7 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
                     <FormLabel>Tipo de Desconto</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecione o tipo">
                             {field.value === "VALOR_FIXO" ? "Valor Fixo (R$)" : field.value === "PERCENTUAL" ? "Percentual (%)" : "Selecione o tipo"}
                           </SelectValue>
@@ -549,7 +549,7 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
                       ) : (
                         <div className="relative">
                           <Percent className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" {...field} disabled={isPending} />
+                          <Input placeholder="0" type="number" step="0.01" {...field} disabled={isPending} />
                         </div>
                       )}
                     </FormControl>
@@ -558,68 +558,72 @@ export function VehicleSaleTab({ vehicle, onSuccess }: VehicleSaleTabProps) {
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="total_value"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor Total Final</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="text"
-                      className="font-bold text-primary text-lg bg-primary/5"
-                      readOnly
-                      value={field.value ? formatCurrency(field.value) : "R$ 0,00"}
-                      disabled={isPending}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="commission_percent_applied"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Comissão do Vendedor (%)</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input type="number" step="0.01" className="pl-9" {...field} disabled={isPending} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="payment_method"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Método de Pagamento</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
+            <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="total_value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valor Total Final</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o método de pagamento" />
-                      </SelectTrigger>
+                      <Input
+                        type="text"
+                        className="font-bold text-primary text-lg bg-primary/5"
+                        readOnly
+                        value={field.value ? formatCurrency(field.value) : "R$ 0,00"}
+                        disabled={isPending}
+                      />
                     </FormControl>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {paymentMethods.map((p) => (
-                        <SelectItem key={p.id} value={p.nome}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+
+              <FormField
+                control={form.control}
+                name="payment_method"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Método de Pagamento</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecione o método de pagamento" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent alignItemWithTrigger={false}>
+                        {paymentMethods.map((p) => (
+                          <SelectItem key={p.id} value={p.nome}>
+                            {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="commission_percent_applied"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Comissão do Vendedor (%)</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" step="0.01" className="pl-9" {...field} disabled={isPending} />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+            </div>
+
           </div>
 
           <FormField

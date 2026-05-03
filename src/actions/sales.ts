@@ -6,7 +6,7 @@ import { createAdminClient, createClient } from "@/utils/supabase/server"
 export async function getVehicleSaleAction(vehicleId: number) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error: _error } = await supabase
     .from("sales")
     .select(`
       *,
@@ -94,7 +94,7 @@ export async function registerVehicleSaleAction(formData: FormData) {
   }
 
   // 3. Fetch updated vehicle
-  const { data: updatedVehicle, error: fetchError } = await supabase
+  const { data: updatedVehicle, error: _fetchError } = await supabase
     .from("vehicles")
     .select("*")
     .eq("id", parseInt(vehicle_id))
@@ -206,4 +206,135 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number,
   revalidatePath("/financeiro")
   
   return { success: true, vehicle: updatedVehicle || null }
+}
+
+export async function listSalesAction({
+  page = 1,
+  pageSize = 12,
+  search = "",
+  status = "Todos",
+}: {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: string
+}) {
+  const supabase = await createClient()
+
+  let query = supabase
+    .from("sales")
+    .select(`
+      *,
+      customer:customers(name, cpf_cnpj, email, phone),
+      vehicle:vehicles(id, brand, model, plate, year_model),
+      seller:users!sales_seller_id_fkey(name, email)
+    `, { count: "exact" })
+
+  if (status && status !== "Todos") {
+    query = query.eq("status", status)
+  }
+
+  if (search) {
+    // Search by customer name, vehicle brand, or vehicle model
+    // Note: Supabase's simple text search might need tuning for relationships
+    // A simpler approach for now is to fetch and filter, but that breaks pagination
+    // Ideally we'd have a view or text search column. We'll do a basic filter for now.
+    query = query.or(`customer.name.ilike.%${search}%,vehicle.brand.ilike.%${search}%,vehicle.model.ilike.%${search}%`)
+  }
+
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  query = query.order("created_at", { ascending: false }).range(from, to)
+
+  const { data, count, error } = await query
+
+  if (error) {
+    console.error("List sales error:", error)
+    return { success: false, error: "Falha ao buscar vendas.", data: [], count: 0 }
+  }
+
+  return { success: true, data: data || [], count: count || 0 }
+}
+
+export async function getSalesKpisAction() {
+  const supabase = await createClient()
+  
+  // Basic KPIs: Total sales count, Total Revenue, Pending Revenue
+  
+  const { data: sales, error } = await supabase
+    .from("sales")
+    .select("status, total_value")
+    .neq("status", "CANCELADA")
+
+  if (error) {
+    console.error("KPI sales error:", error)
+    return { 
+      success: false, 
+      data: {
+        totalSales: 0,
+        completedRevenue: 0,
+        pendingRevenue: 0,
+        averageTicket: 0
+      } 
+    }
+  }
+
+  let totalSales = 0
+  let completedRevenue = 0
+  let pendingRevenue = 0
+
+  sales?.forEach(sale => {
+    totalSales++
+    if (sale.status === 'CONCLUIDA') {
+      completedRevenue += Number(sale.total_value || 0)
+    } else if (sale.status === 'PENDENTE') {
+      pendingRevenue += Number(sale.total_value || 0)
+    }
+  })
+
+  const averageTicket = totalSales > 0 ? (completedRevenue + pendingRevenue) / totalSales : 0
+
+  return { 
+    success: true, 
+    data: {
+      totalSales,
+      completedRevenue,
+      pendingRevenue,
+      averageTicket
+    } 
+  }
+}
+
+export async function getSaleByIdAction(saleId: number) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("sales")
+    .select(`
+      *,
+      customer:customers(name, cpf_cnpj, email, phone),
+      vehicle:vehicles(id, brand, model, plate, year_model, price, status),
+      seller:users!sales_seller_id_fkey(name, email)
+    `)
+    .eq("id", saleId)
+    .single()
+
+  if (error || !data) {
+    return { success: false, error: "Venda não encontrada." }
+  }
+
+  // Fetch transactions
+  const { data: transactions } = await supabase
+    .from("transactions")
+    .select("*, category:transaction_categories(id, nome), payment_method:payment_methods(id, nome, codigo), attachments:transaction_attachments(*)")
+    .eq("venda_id", saleId)
+    .eq("is_deleted", false)
+    .eq("pendente", false)
+
+  const totalPaid = (transactions ?? []).reduce((acc, t) => acc + Number(t.valor), 0)
+  data.total_paid = totalPaid
+  data.transactions = transactions || []
+
+  return { success: true, data }
 }

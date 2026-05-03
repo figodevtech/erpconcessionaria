@@ -137,11 +137,11 @@ export default function TypesPage() {
     dialogMode: DialogMode;
     buttonLabel: string;
   }[] = [
-    { key: "categories", label: "Categorias de transação", description: "Organize o fluxo de caixa", icon: Tags, count: categories.length, dialogMode: "category", buttonLabel: "Nova categoria" },
-    { key: "documents", label: "Categorias de documentos", description: "Classifique os anexos", icon: Files, count: documentCategories.length, dialogMode: "documentCategory", buttonLabel: "Nova categoria" },
-    { key: "banks", label: "Bancos e contas", description: "Caixas / contas bancárias", icon: Building2, count: bankAccounts.length, dialogMode: "bank", buttonLabel: "Novo banco" },
-    { key: "payments", label: "Métodos de pagamento", description: "Formas de pagamento", icon: CreditCard, count: paymentMethods.length, dialogMode: "payment", buttonLabel: "Novo método" },
-  ];
+      { key: "categories", label: "Categorias de transação", description: "Organize o fluxo de caixa", icon: Tags, count: categories.length, dialogMode: "category", buttonLabel: "Nova categoria" },
+      { key: "documents", label: "Categorias de documentos", description: "Classifique os anexos", icon: Files, count: documentCategories.length, dialogMode: "documentCategory", buttonLabel: "Nova categoria" },
+      { key: "banks", label: "Bancos e contas", description: "Caixas / contas bancárias", icon: Building2, count: bankAccounts.length, dialogMode: "bank", buttonLabel: "Novo banco" },
+      { key: "payments", label: "Métodos de pagamento", description: "Formas de pagamento", icon: CreditCard, count: paymentMethods.length, dialogMode: "payment", buttonLabel: "Novo método" },
+    ];
 
   const active = navItems.find((n) => n.key === activeTab)!;
 
@@ -149,17 +149,17 @@ export default function TypesPage() {
 
   return (
     <>
-    <div className="flex gap-0 overflow-hidden rounded-xl border border-white/6 bg-card">
+      <div className="flex gap-0 overflow-hidden rounded-xl border border-white/6 bg-card">
 
-      {/* ── Sidebar de navegação ───────────────────────────────────── */}
-      <aside className="hidden w-[220px] shrink-0 flex-col border-r border-white/6 md:flex">
-        <div className="border-b border-white/6 px-4 py-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cadastros</p>
-        </div>
-        <nav className="flex flex-1 flex-col gap-0.5 p-2">
-          {loading
-            ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)
-            : navItems.map((item) => {
+        {/* ── Sidebar de navegação ───────────────────────────────────── */}
+        <aside className="hidden w-[220px] shrink-0 flex-col border-r border-white/6 md:flex">
+          <div className="border-b border-white/6 px-4 py-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cadastros</p>
+          </div>
+          <nav className="flex flex-1 flex-col gap-0.5 p-2">
+            {loading
+              ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)
+              : navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.key;
                 return (
@@ -177,73 +177,73 @@ export default function TypesPage() {
                   </button>
                 );
               })}
-        </nav>
-        <div className="border-t border-white/6 p-3">
-          <button onClick={fetchData} disabled={loading} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] text-muted-foreground transition-colors hover:bg-white/4 hover:text-foreground disabled:opacity-50">
-            <Loader2 className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-            Recarregar
-          </button>
-        </div>
-      </aside>
+          </nav>
+          <div className="border-t border-white/6 p-3">
+            <button onClick={fetchData} disabled={loading} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] text-muted-foreground transition-colors hover:bg-white/4 hover:text-foreground disabled:opacity-50">
+              <Loader2 className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+              Recarregar
+            </button>
+          </div>
+        </aside>
 
-      {/* ── Painel principal ────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col">
+        {/* ── Painel principal ────────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-1 flex-col">
 
-        {/* Mobile tabs */}
-        <div className="border-b border-white/6 px-4 pt-4 md:hidden">
-          <div className="flex gap-1 overflow-x-auto pb-3">
-            {navItems.map((item) => (
-              <button key={item.key} type="button" onClick={() => setActiveTab(item.key)}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${activeTab === item.key ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                {item.label.split(" ")[0]}
-              </button>
-            ))}
+          {/* Mobile tabs */}
+          <div className="border-b border-white/6 px-4 pt-4 md:hidden">
+            <div className="flex gap-1 overflow-x-auto pb-3">
+              {navItems.map((item) => (
+                <button key={item.key} type="button" onClick={() => setActiveTab(item.key)}
+                  className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${activeTab === item.key ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {item.label.split(" ")[0]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 p-5">
+            {loading ? (
+              <Skeleton className="h-[420px] w-full" />
+            ) : (
+              <>
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">{active.label}</h2>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{active.description}</p>
+                  </div>
+                  {canCreate && (
+                    <Button size="sm" className="shrink-0" onClick={() => { setEditTarget(null); setDialogMode(active.dialogMode); }}>
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      {active.buttonLabel}
+                    </Button>
+                  )}
+                </div>
+                {activeTab === "categories" && <CategoriesTable items={categories} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("category"); }} />}
+                {activeTab === "documents" && <DocumentCategoriesTable items={documentCategories} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("documentCategory"); }} />}
+                {activeTab === "banks" && <BankAccountsTable items={bankAccounts} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("bank"); }} />}
+                {activeTab === "payments" && <PaymentMethodsTable items={paymentMethods} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("payment"); }} />}
+              </>
+            )}
           </div>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 p-5">
-          {loading ? (
-            <Skeleton className="h-[420px] w-full" />
-          ) : (
-            <>
-              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">{active.label}</h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{active.description}</p>
-                </div>
-                {canCreate && (
-                  <Button size="sm" className="shrink-0" onClick={() => { setEditTarget(null); setDialogMode(active.dialogMode); }}>
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    {active.buttonLabel}
-                  </Button>
-                )}
-              </div>
-              {activeTab === "categories" && <CategoriesTable items={categories} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("category"); }} />}
-              {activeTab === "documents" && <DocumentCategoriesTable items={documentCategories} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("documentCategory"); }} />}
-              {activeTab === "banks" && <BankAccountsTable items={bankAccounts} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("bank"); }} />}
-              {activeTab === "payments" && <PaymentMethodsTable items={paymentMethods} onChanged={fetchData} canUpdate={canUpdate} canDelete={canDelete} onEdit={(item) => { setEditTarget(item); setDialogMode("payment"); }} />}
-            </>
-          )}
-        </div>
       </div>
-    </div>
-    <TypeCreateDialog
-      mode={dialogMode}
-      target={editTarget}
-      onOpenChange={(open) => {
-        if (!open) {
+      <TypeCreateDialog
+        mode={dialogMode}
+        target={editTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialogMode(null);
+            setEditTarget(null);
+          }
+        }}
+        onSuccess={() => {
           setDialogMode(null);
           setEditTarget(null);
-        }
-      }}
-      onSuccess={() => {
-        setDialogMode(null);
-        setEditTarget(null);
-        fetchData();
-      }}
-    />
+          fetchData();
+        }}
+      />
     </>
   );
 }
@@ -553,7 +553,7 @@ function RowActions({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2 sm:gap-0">
-              <AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel className="mr-2" disabled={isPending}>Cancelar</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 disabled={isPending}
@@ -608,56 +608,56 @@ function TypeCreateDialog({
     if (!open) return;
 
     const timeout = setTimeout(() => {
-    if (!target) {
-      setForm({
-        nome: "",
-        descricao: "",
-        titulo: "",
-        valor_inicial: "0,00",
-        agencia: "",
-        conta_numero: "",
-        tipo: "CORRENTE",
-        proprietario: "",
-        codigo: "PIX",
-        ativo: true,
-      });
-      return;
-    }
+      if (!target) {
+        setForm({
+          nome: "",
+          descricao: "",
+          titulo: "",
+          valor_inicial: "0,00",
+          agencia: "",
+          conta_numero: "",
+          tipo: "CORRENTE",
+          proprietario: "",
+          codigo: "PIX",
+          ativo: true,
+        });
+        return;
+      }
 
-    if ((mode === "category" || mode === "documentCategory") && "nome" in target) {
-      setForm((prev) => ({
-        ...prev,
-        nome: target.nome,
-        descricao: target.descricao || "",
-        ativo: target.ativo,
-      }));
-    }
+      if ((mode === "category" || mode === "documentCategory") && "nome" in target) {
+        setForm((prev) => ({
+          ...prev,
+          nome: target.nome,
+          descricao: target.descricao || "",
+          ativo: target.ativo,
+        }));
+      }
 
-    if (mode === "bank" && "titulo" in target) {
-      setForm((prev) => ({
-        ...prev,
-        titulo: target.titulo,
-        valor_inicial: target.valor_inicial.toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-        agencia: target.agencia || "",
-        conta_numero: target.conta_numero || "",
-        tipo: target.tipo,
-        proprietario: target.proprietario || "",
-        ativo: target.ativo,
-      }));
-    }
+      if (mode === "bank" && "titulo" in target) {
+        setForm((prev) => ({
+          ...prev,
+          titulo: target.titulo,
+          valor_inicial: target.valor_inicial.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }),
+          agencia: target.agencia || "",
+          conta_numero: target.conta_numero || "",
+          tipo: target.tipo,
+          proprietario: target.proprietario || "",
+          ativo: target.ativo,
+        }));
+      }
 
-    if (mode === "payment" && "codigo" in target) {
-      setForm((prev) => ({
-        ...prev,
-        nome: target.nome,
-        codigo: target.codigo,
-        descricao: target.descricao || "",
-        ativo: target.ativo,
-      }));
-    }
+      if (mode === "payment" && "codigo" in target) {
+        setForm((prev) => ({
+          ...prev,
+          nome: target.nome,
+          codigo: target.codigo,
+          descricao: target.descricao || "",
+          ativo: target.ativo,
+        }));
+      }
     }, 0);
 
     return () => clearTimeout(timeout);
@@ -673,22 +673,22 @@ function TypeCreateDialog({
         mode === "category"
           ? isEditing && target
             ? await updateTransactionCategoryAction(target.id, {
-                nome: form.nome,
-                descricao: form.descricao,
-                ativo: form.ativo,
-              })
+              nome: form.nome,
+              descricao: form.descricao,
+              ativo: form.ativo,
+            })
             : await createTransactionCategoryAction({ nome: form.nome, descricao: form.descricao })
           : mode === "documentCategory"
             ? isEditing && target
               ? await updateDocumentCategoryAction(target.id, {
-                  nome: form.nome,
-                  descricao: form.descricao,
-                  ativo: form.ativo,
-                })
+                nome: form.nome,
+                descricao: form.descricao,
+                ativo: form.ativo,
+              })
               : await createDocumentCategoryAction({ nome: form.nome, descricao: form.descricao })
-          : mode === "bank"
-            ? isEditing && target
-              ? await updateBankAccountAction(target.id, {
+            : mode === "bank"
+              ? isEditing && target
+                ? await updateBankAccountAction(target.id, {
                   titulo: form.titulo,
                   valor_inicial: form.valor_inicial,
                   agencia: form.agencia,
@@ -697,7 +697,7 @@ function TypeCreateDialog({
                   proprietario: form.proprietario,
                   ativo: form.ativo,
                 })
-              : await createBankAccountAction({
+                : await createBankAccountAction({
                   titulo: form.titulo,
                   valor_inicial: form.valor_inicial,
                   agencia: form.agencia,
@@ -705,14 +705,14 @@ function TypeCreateDialog({
                   tipo: form.tipo,
                   proprietario: form.proprietario,
                 })
-            : isEditing && target
-              ? await updatePaymentMethodAction(target.id, {
+              : isEditing && target
+                ? await updatePaymentMethodAction(target.id, {
                   nome: form.nome,
                   codigo: form.codigo,
                   descricao: form.descricao,
                   ativo: form.ativo,
                 })
-              : await createPaymentMethodAction({
+                : await createPaymentMethodAction({
                   nome: form.nome,
                   codigo: form.codigo,
                   descricao: form.descricao,

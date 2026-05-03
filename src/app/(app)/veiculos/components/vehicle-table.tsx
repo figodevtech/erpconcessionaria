@@ -128,7 +128,7 @@ export function VehicleTable({
                 <TableHead className="text-right">% Lucro</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-center">Adicionado em</TableHead>
-                <TableHead className="text-center">Acoes</TableHead>
+                <TableHead className="text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -153,8 +153,8 @@ export function VehicleTable({
                         <Image
                           src={vehicle.image || ""}
                           alt={vehicle.brand}
-                          width={50}
-                          height={50}
+                          width={70}
+                          height={70}
                           className="rounded-md"
                         />
                       </TableCell>

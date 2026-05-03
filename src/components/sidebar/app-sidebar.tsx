@@ -15,6 +15,7 @@ import {
   Globe,
   WalletCards,
   Layers3,
+  Handshake
 } from "lucide-react";
 import { NavMain } from "./components/nav-main";
 import { NavSettings } from "./components/nav-settings";
@@ -51,6 +52,12 @@ const data = {
       url: "/veiculos",
       icon: Car,
       slug: "vehicles:view",
+    },
+    {
+      title: "Vendas",
+      url: "/vendas",
+      icon: Handshake,
+      slug: "sales:view",
     },
     {
       title: "Fluxo de Caixa",

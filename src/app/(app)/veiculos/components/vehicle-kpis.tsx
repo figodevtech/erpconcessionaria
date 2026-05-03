@@ -36,7 +36,7 @@ export function VehicleKPIs({ refreshKey = 0 }: { refreshKey?: number }) {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total de Veiculos</CardTitle>
+          <CardTitle className="text-sm font-medium">Total de Veículos</CardTitle>
           <CarFront className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -46,7 +46,7 @@ export function VehicleKPIs({ refreshKey = 0 }: { refreshKey?: number }) {
       </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Disponiveis</CardTitle>
+          <CardTitle className="text-sm font-medium">Disponíveis</CardTitle>
           <Tag className="h-4 w-4 text-primary" />
         </CardHeader>
         <CardContent>
@@ -66,14 +66,14 @@ export function VehicleKPIs({ refreshKey = 0 }: { refreshKey?: number }) {
       </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Valor Medio</CardTitle>
+          <CardTitle className="text-sm font-medium">Valor Médio</CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
             {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data.averageValue)}
           </div>
-          <p className="text-xs text-muted-foreground">Dos veiculos disponiveis</p>
+          <p className="text-xs text-muted-foreground">Dos veículos disponíveis</p>
         </CardContent>
       </Card>
     </div>
