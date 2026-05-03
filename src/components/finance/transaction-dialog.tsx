@@ -100,9 +100,9 @@ export function TransactionDialog({
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [customerSearch, setCustomerSearch] = useState("");
 
-  const filteredCustomers = customers.filter(c => 
-    !customerSearch || 
-    c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+  const filteredCustomers = customers.filter(c =>
+    !customerSearch ||
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
     (c.cpf_cnpj && c.cpf_cnpj.includes(customerSearch))
   );
 
@@ -204,7 +204,7 @@ export function TransactionDialog({
         } else {
           setCustomers([]);
         }
-      } catch {}
+      } catch { }
     }
 
     fetchOptions();
@@ -505,7 +505,7 @@ export function TransactionDialog({
                       <FormLabel>Cliente cadastrado</FormLabel>
                       <Combobox
                         items={customers}
-                        value={field.value}
+                        value={customers.find((item) => item.id.toString() === field.value)?.name.toString() || "none"}
                         onValueChange={(value) => {
                           const nextValue = value === "none" ? "" : value;
                           field.onChange(nextValue);
