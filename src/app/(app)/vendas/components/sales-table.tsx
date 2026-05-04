@@ -53,12 +53,18 @@ export function SalesTable({
   page,
   setPage,
   onKpisShouldRefresh,
+  onCountChange,
+  onLoadingChange,
+  refreshKey = 0,
 }: {
   search: string
   status: string
   page: number
   setPage: (p: number) => void
   onKpisShouldRefresh?: () => void
+  onCountChange?: (count: number) => void
+  onLoadingChange?: (loading: boolean) => void
+  refreshKey?: number
 }) {
   const { hasPermission } = usePermissions()
   const [sales, setSales] = useState<Sale[]>([])
@@ -74,20 +80,24 @@ export function SalesTable({
 
   const fetchData = useCallback(async () => {
     setLoading(true)
+    onLoadingChange?.(true)
     const result = await listSalesAction({ page, pageSize, search, status })
     if (result.success) {
       setSales(result.data as Sale[])
-      setCount(result.count || 0)
+      const total = result.count || 0
+      setCount(total)
+      onCountChange?.(total)
     } else {
       toast.error(result.error || "Erro ao carregar vendas")
     }
     setLoading(false)
-  }, [page, search, status])
+    onLoadingChange?.(false)
+  }, [page, search, status, onLoadingChange, onCountChange])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData()
-  }, [fetchData])
+  }, [fetchData, refreshKey])
 
   const totalPages = Math.ceil(count / pageSize)
 
@@ -121,9 +131,10 @@ export function SalesTable({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden shadow-sm">
-        <ScrollArea className="w-full">
+    <div className="relative min-h-[400px] w-full">
+      <ScrollArea className="w-full">
+        <div className="min-w-full p-4">
+
           <Table className="text-xs">
             <TableHeader>
               <TableRow className="bg-muted/30">
@@ -231,9 +242,10 @@ export function SalesTable({
               )}
             </TableBody>
           </Table>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
-      </div>
+        </div>
+
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
 
       <div className="flex justify-end p-2">
         <SalesPagination
@@ -275,7 +287,7 @@ export function SalesTable({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel disabled={isPending}>Voltar</AlertDialogCancel>
+            <AlertDialogCancel className="mr-2" disabled={isPending} >Voltar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isPending}

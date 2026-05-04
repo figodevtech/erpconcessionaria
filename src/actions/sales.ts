@@ -102,7 +102,7 @@ export async function registerVehicleSaleAction(formData: FormData) {
 
   revalidatePath("/veiculos")
   revalidatePath("/dashboard")
-  
+
   return { success: true, data: sale, vehicle: updatedVehicle || null }
 }
 
@@ -123,7 +123,7 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number,
   // 1. Update sale to CANCELADA and record who canceled
   const { error: saleError } = await admin
     .from("sales")
-    .update({ 
+    .update({
       status: 'CANCELADA',
       updated_at: new Date().toISOString(),
       updated_by: user.id
@@ -204,7 +204,7 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number,
   revalidatePath("/veiculos")
   revalidatePath("/dashboard")
   revalidatePath("/financeiro")
-  
+
   return { success: true, vehicle: updatedVehicle || null }
 }
 
@@ -235,11 +235,25 @@ export async function listSalesAction({
   }
 
   if (search) {
-    // Search by customer name, vehicle brand, or vehicle model
-    // Note: Supabase's simple text search might need tuning for relationships
-    // A simpler approach for now is to fetch and filter, but that breaks pagination
-    // Ideally we'd have a view or text search column. We'll do a basic filter for now.
-    query = query.or(`customer.name.ilike.%${search}%,vehicle.brand.ilike.%${search}%,vehicle.model.ilike.%${search}%`)
+    // PostgREST does not support .or() on related table columns.
+    // We resolve matching IDs first, then filter the main query by those IDs.
+    const [{ data: customers }, { data: vehicles }] = await Promise.all([
+      supabase.from("customers").select("id").ilike("name", `%${search}%`),
+      supabase.from("vehicles").select("id").or(`brand.ilike.%${search}%,model.ilike.%${search}%`),
+    ])
+
+    const customerIds = (customers ?? []).map((c) => c.id)
+    const vehicleIds = (vehicles ?? []).map((v) => v.id)
+
+    if (customerIds.length === 0 && vehicleIds.length === 0) {
+      // No matches found — return empty result immediately
+      return { success: true, data: [], count: 0 }
+    }
+
+    const orParts: string[] = []
+    if (customerIds.length) orParts.push(`customer_id.in.(${customerIds.join(",")})`)
+    if (vehicleIds.length) orParts.push(`vehicle_id.in.(${vehicleIds.join(",")})`)
+    query = query.or(orParts.join(","))
   }
 
   const from = (page - 1) * pageSize
@@ -259,9 +273,9 @@ export async function listSalesAction({
 
 export async function getSalesKpisAction() {
   const supabase = await createClient()
-  
+
   // Basic KPIs: Total sales count, Total Revenue, Pending Revenue
-  
+
   const { data: sales, error } = await supabase
     .from("sales")
     .select("status, total_value")
@@ -269,14 +283,14 @@ export async function getSalesKpisAction() {
 
   if (error) {
     console.error("KPI sales error:", error)
-    return { 
-      success: false, 
+    return {
+      success: false,
       data: {
         totalSales: 0,
         completedRevenue: 0,
         pendingRevenue: 0,
         averageTicket: 0
-      } 
+      }
     }
   }
 
@@ -295,14 +309,14 @@ export async function getSalesKpisAction() {
 
   const averageTicket = totalSales > 0 ? (completedRevenue + pendingRevenue) / totalSales : 0
 
-  return { 
-    success: true, 
+  return {
+    success: true,
     data: {
       totalSales,
       completedRevenue,
       pendingRevenue,
       averageTicket
-    } 
+    }
   }
 }
 

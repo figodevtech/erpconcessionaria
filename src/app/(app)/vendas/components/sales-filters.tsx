@@ -1,15 +1,9 @@
 "use client"
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search } from "lucide-react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 interface SalesFiltersProps {
   search: string
@@ -26,45 +20,48 @@ export function SalesFilters({
   setStatus,
   setPage,
 }: SalesFiltersProps) {
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value)
+    setPage(1)
+  }
+
+  const handleStatusChange = (val: string | null) => {
+    if (val === null) return
+    setStatus(val)
+    setPage(1)
+  }
+
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end">
-      <div className="flex-1 space-y-1">
-        <Label htmlFor="search" className="text-xs text-muted-foreground uppercase tracking-wider">Buscar Venda</Label>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            id="search"
-            placeholder="Buscar por cliente ou veículo..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1) // Reset page on search
-            }}
-            className="pl-9 bg-card border-border shadow-sm rounded-xl h-10"
-          />
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider">Filtros</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por cliente ou veículo..."
+              className="pl-9 h-10"
+              value={search}
+              onChange={handleSearchChange}
+            />
+          </div>
+
+          <Select value={status} onValueChange={handleStatusChange}>
+            <SelectTrigger className="w-[180px] h-10">
+              <SelectValue placeholder="Filtrar por Status" />
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false} align="end">
+              <SelectItem className="hover:cursor-pointer" value="Todos">Todos os Status</SelectItem>
+              <SelectItem className="hover:cursor-pointer" value="PENDENTE">Pendente</SelectItem>
+              <SelectItem className="hover:cursor-pointer" value="CONCLUIDA">Concluída</SelectItem>
+              <SelectItem className="hover:cursor-pointer" value="CANCELADA">Cancelada</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </div>
-      
-      <div className="w-full md:w-48 space-y-1">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Status</Label>
-        <Select 
-          value={status} 
-          onValueChange={(val) => {
-            setStatus(val)
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="bg-card border-border shadow-sm rounded-xl h-10">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
-            <SelectItem value="Todos">Todos</SelectItem>
-            <SelectItem value="PENDENTE">Pendente</SelectItem>
-            <SelectItem value="CONCLUIDA">Concluída</SelectItem>
-            <SelectItem value="CANCELADA">Cancelada</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
