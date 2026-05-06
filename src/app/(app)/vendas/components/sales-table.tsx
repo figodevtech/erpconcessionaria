@@ -36,6 +36,7 @@ import { formatCurrency } from "@/lib/utils"
 import { SalesPagination } from "./sales-pagination"
 import { SaleDialog } from "./sale-dialog"
 import { VehicleDialog } from "../../veiculos/components/vehicle-dialog"
+import type { Vehicle } from "../../veiculos/components/vehicle-list-client"
 
 interface Sale {
   id: number
@@ -72,7 +73,7 @@ export function SalesTable({
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
 
-  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null)
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
   const [viewSaleId, setViewSaleId] = useState<number | null>(null)
   const [saleToCancel, setSaleToCancel] = useState<Sale | null>(null)
 
@@ -219,7 +220,7 @@ export function SalesTable({
                           </DropdownMenuItem>
 
                           <DropdownMenuItem
-                            onClick={() => setSelectedVehicle(sale.vehicle)}
+                            onClick={() => setSelectedVehicle(sale.vehicle as unknown as Vehicle)}
                             className="cursor-pointer"
                           >
                             <Car className="mr-2 h-4 w-4" />
@@ -259,6 +260,10 @@ export function SalesTable({
         open={!!viewSaleId}
         onOpenChange={(open) => !open && setViewSaleId(null)}
         saleId={viewSaleId}
+        onChanged={() => {
+          fetchData()
+          if (onKpisShouldRefresh) onKpisShouldRefresh()
+        }}
       />
 
       <VehicleDialog

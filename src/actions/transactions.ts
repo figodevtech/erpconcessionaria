@@ -18,7 +18,7 @@ const ATTACHMENTS_BUCKET = "transaction-attachments";
 type ActionResult<T> = {
   success: boolean;
   data?: T;
-  vehicle?: any;
+  vehicle?: unknown;
   count?: number;
   error?: string;
 };
@@ -278,15 +278,22 @@ export async function createTransactionAction(
     payerDocument = customer.cpf_cnpj;
   }
 
+  const saleId = nullableNumber(values.venda_id);
+  const transactionType = values.tipo as TransactionType;
+
+  if (saleId && transactionType !== "RECEITA") {
+    return { success: false, error: "Pagamentos de venda devem ser registrados como receita." };
+  }
+
   const payload = {
     descricao: values.descricao.trim(),
     valor,
     data: values.data,
     metodo_pagamento: selectedPaymentCode,
     categoria: selectedCategoryName,
-    tipo: values.tipo as TransactionType,
+    tipo: saleId ? "RECEITA" : transactionType,
     vehicle_id: nullableNumber(values.vehicle_id),
-    venda_id: nullableNumber(values.venda_id),
+    venda_id: saleId,
     customer_id: selectedCustomerId,
     categoria_id: nullableNumber(values.categoria_id),
     banco_id: nullableNumber(values.banco_id),
@@ -328,6 +335,7 @@ export async function createTransactionAction(
         .from("transactions")
         .select("valor")
         .eq("venda_id", payload.venda_id)
+        .eq("tipo", "RECEITA")
         .eq("is_deleted", false)
         .eq("pendente", false); // Only count confirmed payments
 
@@ -406,6 +414,7 @@ export async function createTransactionAction(
 
   revalidatePath("/financeiro");
   revalidatePath("/veiculos");
+  revalidatePath("/vendas");
 
   return { success: true, data: transaction, vehicle: updatedVehicle };
 }
@@ -486,6 +495,7 @@ export async function softDeleteTransactionAction(id: number) {
         .from("transactions")
         .select("valor")
         .eq("venda_id", tx.venda_id)
+        .eq("tipo", "RECEITA")
         .eq("is_deleted", false)
         .eq("pendente", false);
 
@@ -511,6 +521,7 @@ export async function softDeleteTransactionAction(id: number) {
 
   revalidatePath("/financeiro");
   revalidatePath("/veiculos");
+  revalidatePath("/vendas");
   return { success: true, vehicle: updatedVehicle };
 }
 

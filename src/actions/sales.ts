@@ -6,7 +6,7 @@ import { createAdminClient, createClient } from "@/utils/supabase/server"
 export async function getVehicleSaleAction(vehicleId: number) {
   const supabase = await createClient()
 
-  const { data, error: _error } = await supabase
+  const { data } = await supabase
     .from("sales")
     .select(`
       *,
@@ -24,6 +24,7 @@ export async function getVehicleSaleAction(vehicleId: number) {
       .from("transactions")
       .select("*, category:transaction_categories(id, nome), payment_method:payment_methods(id, nome, codigo), attachments:transaction_attachments(*)")
       .eq("venda_id", data.id)
+      .eq("tipo", "RECEITA")
       .eq("is_deleted", false)
       .eq("pendente", false)
 
@@ -94,7 +95,7 @@ export async function registerVehicleSaleAction(formData: FormData) {
   }
 
   // 3. Fetch updated vehicle
-  const { data: updatedVehicle, error: _fetchError } = await supabase
+  const { data: updatedVehicle } = await supabase
     .from("vehicles")
     .select("*")
     .eq("id", parseInt(vehicle_id))
@@ -102,6 +103,7 @@ export async function registerVehicleSaleAction(formData: FormData) {
 
   revalidatePath("/veiculos")
   revalidatePath("/dashboard")
+  revalidatePath("/vendas")
 
   return { success: true, data: sale, vehicle: updatedVehicle || null }
 }
@@ -121,12 +123,15 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number,
   }
 
   // 1. Update sale to CANCELADA and record who canceled
+  const canceledAt = new Date().toISOString()
   const { error: saleError } = await admin
     .from("sales")
     .update({
       status: 'CANCELADA',
-      updated_at: new Date().toISOString(),
-      updated_by: user.id
+      updated_at: canceledAt,
+      updated_by: user.id,
+      canceled_at: canceledAt,
+      canceled_by: user.id
     })
     .eq("id", saleId)
 
@@ -204,6 +209,7 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number,
   revalidatePath("/veiculos")
   revalidatePath("/dashboard")
   revalidatePath("/financeiro")
+  revalidatePath("/vendas")
 
   return { success: true, vehicle: updatedVehicle || null }
 }
@@ -343,6 +349,7 @@ export async function getSaleByIdAction(saleId: number) {
     .from("transactions")
     .select("*, category:transaction_categories(id, nome), payment_method:payment_methods(id, nome, codigo), attachments:transaction_attachments(*)")
     .eq("venda_id", saleId)
+    .eq("tipo", "RECEITA")
     .eq("is_deleted", false)
     .eq("pendente", false)
 

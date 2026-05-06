@@ -116,7 +116,7 @@ export function VehicleFinanceTab({ vehicle, onSuccess }: { vehicle: Vehicle, on
         onOpenChange={setDialogOpen}
         onSuccess={(v) => {
           fetchData();
-          if (onSuccess) onSuccess(v);
+          if (onSuccess) onSuccess(v as Vehicle | undefined);
           setDialogOpen(false);
         }}
         vehicle={{

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import {
   Building2,
-  CheckCircle2,
   CreditCard,
   Files,
   Edit,
@@ -28,23 +27,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -55,41 +37,33 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  createBankAccountAction,
-  createDocumentCategoryAction,
-  createPaymentMethodAction,
-  createTransactionCategoryAction,
   deleteBankAccountAction,
   deleteDocumentCategoryAction,
   deletePaymentMethodAction,
   deleteTransactionCategoryAction,
   getTypeCatalogAction,
-  updateBankAccountAction,
   updateBankAccountStatusAction,
-  updateDocumentCategoryAction,
   updateDocumentCategoryStatusAction,
-  updatePaymentMethodAction,
   updatePaymentMethodStatusAction,
-  updateTransactionCategoryAction,
   updateTransactionCategoryStatusAction,
 } from "@/actions/type-catalog";
+import {
+  TypeCreateDialog,
+  type TypeDialogMode,
+  type TypeEditTarget,
+} from "./components/type-create-dialog";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/utils";
 import {
-  BANK_ACCOUNT_TYPES,
   bankAccountTypeLabel,
   type BankAccount,
-  type BankAccountType,
   type DocumentCategory,
   type DynamicPaymentMethod,
   type TransactionCategory,
 } from "@/lib/type-catalog";
-import { PAYMENT_METHODS, paymentMethodLabel, type PaymentMethod } from "@/lib/transactions";
+import { paymentMethodLabel } from "@/lib/transactions";
 
-type DialogMode = "category" | "documentCategory" | "bank" | "payment" | null;
-type EditTarget = TransactionCategory | DocumentCategory | BankAccount | DynamicPaymentMethod | null;
 type TabKey = "categories" | "documents" | "banks" | "payments";
 
 export default function TypesPage() {
@@ -99,8 +73,8 @@ export default function TypesPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<DynamicPaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogMode, setDialogMode] = useState<DialogMode>(null);
-  const [editTarget, setEditTarget] = useState<EditTarget>(null);
+  const [dialogMode, setDialogMode] = useState<TypeDialogMode>(null);
+  const [editTarget, setEditTarget] = useState<TypeEditTarget>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("categories");
 
   const canView = hasPermission("types:view");
@@ -134,7 +108,7 @@ export default function TypesPage() {
     description: string;
     icon: LucideIcon;
     count: number;
-    dialogMode: DialogMode;
+    dialogMode: TypeDialogMode;
     buttonLabel: string;
   }[] = [
       { key: "categories", label: "Categorias de transação", description: "Organize o fluxo de caixa", icon: Tags, count: categories.length, dialogMode: "category", buttonLabel: "Nova categoria" },
@@ -569,256 +543,3 @@ function RowActions({
   );
 }
 
-function TypeCreateDialog({
-  mode,
-  target,
-  onOpenChange,
-  onSuccess,
-}: {
-  mode: DialogMode;
-  target: EditTarget;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
-}) {
-  const [isPending, startTransition] = useTransition();
-  const [form, setForm] = useState({
-    nome: "",
-    descricao: "",
-    titulo: "",
-    valor_inicial: "0,00",
-    agencia: "",
-    conta_numero: "",
-    tipo: "CORRENTE" as BankAccountType,
-    proprietario: "",
-    codigo: "PIX" as PaymentMethod,
-    ativo: true,
-  });
-
-  const open = mode !== null;
-  const isEditing = Boolean(target);
-  const titlePrefix = isEditing ? "Editar" : "Novo";
-  const title =
-    mode === "category" || mode === "documentCategory"
-      ? `${titlePrefix} categoria`
-      : mode === "bank"
-        ? `${titlePrefix} banco`
-        : `${titlePrefix} método`;
-
-  useEffect(() => {
-    if (!open) return;
-
-    const timeout = setTimeout(() => {
-      if (!target) {
-        setForm({
-          nome: "",
-          descricao: "",
-          titulo: "",
-          valor_inicial: "0,00",
-          agencia: "",
-          conta_numero: "",
-          tipo: "CORRENTE",
-          proprietario: "",
-          codigo: "PIX",
-          ativo: true,
-        });
-        return;
-      }
-
-      if ((mode === "category" || mode === "documentCategory") && "nome" in target) {
-        setForm((prev) => ({
-          ...prev,
-          nome: target.nome,
-          descricao: target.descricao || "",
-          ativo: target.ativo,
-        }));
-      }
-
-      if (mode === "bank" && "titulo" in target) {
-        setForm((prev) => ({
-          ...prev,
-          titulo: target.titulo,
-          valor_inicial: target.valor_inicial.toLocaleString("pt-BR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }),
-          agencia: target.agencia || "",
-          conta_numero: target.conta_numero || "",
-          tipo: target.tipo,
-          proprietario: target.proprietario || "",
-          ativo: target.ativo,
-        }));
-      }
-
-      if (mode === "payment" && "codigo" in target) {
-        setForm((prev) => ({
-          ...prev,
-          nome: target.nome,
-          codigo: target.codigo,
-          descricao: target.descricao || "",
-          ativo: target.ativo,
-        }));
-      }
-    }, 0);
-
-    return () => clearTimeout(timeout);
-  }, [mode, open, target]);
-
-  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function submit() {
-    startTransition(async () => {
-      const result =
-        mode === "category"
-          ? isEditing && target
-            ? await updateTransactionCategoryAction(target.id, {
-              nome: form.nome,
-              descricao: form.descricao,
-              ativo: form.ativo,
-            })
-            : await createTransactionCategoryAction({ nome: form.nome, descricao: form.descricao })
-          : mode === "documentCategory"
-            ? isEditing && target
-              ? await updateDocumentCategoryAction(target.id, {
-                nome: form.nome,
-                descricao: form.descricao,
-                ativo: form.ativo,
-              })
-              : await createDocumentCategoryAction({ nome: form.nome, descricao: form.descricao })
-            : mode === "bank"
-              ? isEditing && target
-                ? await updateBankAccountAction(target.id, {
-                  titulo: form.titulo,
-                  valor_inicial: form.valor_inicial,
-                  agencia: form.agencia,
-                  conta_numero: form.conta_numero,
-                  tipo: form.tipo,
-                  proprietario: form.proprietario,
-                  ativo: form.ativo,
-                })
-                : await createBankAccountAction({
-                  titulo: form.titulo,
-                  valor_inicial: form.valor_inicial,
-                  agencia: form.agencia,
-                  conta_numero: form.conta_numero,
-                  tipo: form.tipo,
-                  proprietario: form.proprietario,
-                })
-              : isEditing && target
-                ? await updatePaymentMethodAction(target.id, {
-                  nome: form.nome,
-                  codigo: form.codigo,
-                  descricao: form.descricao,
-                  ativo: form.ativo,
-                })
-                : await createPaymentMethodAction({
-                  nome: form.nome,
-                  codigo: form.codigo,
-                  descricao: form.descricao,
-                });
-
-      if (result.success) {
-        toast.success(isEditing ? "Cadastro atualizado" : "Cadastro criado");
-        setForm({
-          nome: "",
-          descricao: "",
-          titulo: "",
-          valor_inicial: "0,00",
-          agencia: "",
-          conta_numero: "",
-          tipo: "CORRENTE",
-          proprietario: "",
-          codigo: "PIX",
-          ativo: true,
-        });
-        onSuccess();
-      } else {
-        toast.error(result.error ?? "Erro ao criar cadastro");
-      }
-    });
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[680px]">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>Preencha os dados para disponibilizar este tipo nos modulos financeiros.</DialogDescription>
-        </DialogHeader>
-
-        {mode === "bank" ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Título"><Input value={form.titulo} onChange={(event) => update("titulo", event.target.value)} /></Field>
-            <Field label="Valor inicial"><Input value={form.valor_inicial} onChange={(event) => update("valor_inicial", event.target.value)} /></Field>
-            <Field label="Tipo">
-              <Select value={form.tipo} onValueChange={(value) => update("tipo", value as BankAccountType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  {BANK_ACCOUNT_TYPES.map((type) => <SelectItem key={type} value={type}>{bankAccountTypeLabel(type)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Proprietario"><Input value={form.proprietario} onChange={(event) => update("proprietario", event.target.value)} /></Field>
-            <Field label="Agencia"><Input value={form.agencia} onChange={(event) => update("agencia", event.target.value)} /></Field>
-            <Field label="Conta"><Input value={form.conta_numero} onChange={(event) => update("conta_numero", event.target.value)} /></Field>
-            <ActiveField ativo={form.ativo} onChange={(value) => update("ativo", value)} />
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            <Field label="Nome"><Input value={form.nome} onChange={(event) => update("nome", event.target.value)} /></Field>
-            {mode === "payment" && (
-              <Field label="Código fiscal">
-                <Select value={form.codigo} onValueChange={(value) => update("codigo", value as PaymentMethod)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    {PAYMENT_METHODS.map((method) => <SelectItem key={method} value={method}>{paymentMethodLabel(method)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-            )}
-            <Field label="Descrição">
-              <Textarea value={form.descricao} onChange={(event) => update("descricao", event.target.value)} className="resize-none" />
-            </Field>
-            <ActiveField ativo={form.ativo} onChange={(value) => update("ativo", value)} />
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>Cancelar</Button>
-          <Button onClick={submit} disabled={isPending}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-            {isEditing ? "Atualizar" : "Salvar"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="grid gap-2">
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function ActiveField({
-  ativo,
-  onChange,
-}: {
-  ativo: boolean;
-  onChange: (ativo: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-xl border bg-muted/20 p-3">
-      <div>
-        <Label>Ativo</Label>
-        <p className="text-xs text-muted-foreground">Disponível para uso em novos lançamentos.</p>
-      </div>
-      <Switch checked={ativo} onCheckedChange={onChange} />
-    </div>
-  );
-}

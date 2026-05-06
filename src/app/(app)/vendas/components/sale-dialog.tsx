@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,6 @@ import {
   ReceiptText,
   User,
   Car,
-  DollarSign,
   FileText,
   TrendingUp,
   Wallet,
@@ -27,42 +26,80 @@ import {
 } from "lucide-react"
 import { getSaleByIdAction } from "@/actions/sales"
 import { formatCurrency } from "@/lib/utils"
+import { TransactionDialog } from "@/components/finance/transaction-dialog"
 import { TransactionTable } from "@/components/finance/transaction-table"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import type { Transaction } from "@/lib/transactions"
 
 interface SaleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   saleId: number | null
+  onChanged?: () => void
 }
 
-export function SaleDialog({ open, onOpenChange, saleId }: SaleDialogProps) {
-  const [loading, setLoading] = useState(false)
-  const [sale, setSale] = useState<any>(null)
+type SaleDetails = {
+  id: number
+  status: string
+  created_at: string
+  total_value: number
+  total_paid: number
+  sub_total: number
+  discount_type: string | null
+  discount_value: number | null
+  payment_method: string | null
+  commission_percent_applied: number | null
+  fiscal_observations: string | null
+  customer?: {
+    name?: string | null
+    cpf_cnpj?: string | null
+    email?: string | null
+    phone?: string | null
+  } | null
+  vehicle?: {
+    id?: number | null
+    brand?: string | null
+    model?: string | null
+    plate?: string | null
+    year_model?: string | number | null
+    price?: number | null
+    status?: string | null
+  } | null
+  seller?: {
+    name?: string | null
+    email?: string | null
+  } | null
+  transactions?: Transaction[]
+}
 
-  async function fetchSale() {
+export function SaleDialog({ open, onOpenChange, saleId, onChanged }: SaleDialogProps) {
+  const [loading, setLoading] = useState(false)
+  const [sale, setSale] = useState<SaleDetails | null>(null)
+  const [transactionDialogOpen, setTransactionDialogOpen] = useState(false)
+
+  const fetchSale = useCallback(async () => {
     if (!saleId) return
 
     setLoading(true)
     try {
       const result = await getSaleByIdAction(saleId)
       if (result.success) {
-        setSale(result.data)
+        setSale(result.data as SaleDetails)
       }
     } catch (error) {
       console.error("Error fetching sale:", error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [saleId])
 
   useEffect(() => {
     if (open) {
       fetchSale()
     }
-  }, [open, saleId])
+  }, [open, fetchSale])
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -100,6 +137,7 @@ export function SaleDialog({ open, onOpenChange, saleId }: SaleDialogProps) {
   const status = sale ? getStatusConfig(sale.status) : getStatusConfig("DEFAULT")
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex flex-col h-svh w-dvw max-w-dvw p-0 overflow-hidden sm:max-w-[1100px] sm:max-h-[min(90vh,850px)] sm:w-[95vw] border-none shadow-2xl rounded-[2.5rem] bg-background/95 backdrop-blur-2xl ring-1 ring-white/10">
         <DialogHeader className="p-8 pb-6 border-b border-white/5 bg-linear-to-b from-muted/50 to-transparent">
@@ -208,7 +246,7 @@ export function SaleDialog({ open, onOpenChange, saleId }: SaleDialogProps) {
                         <div className="pt-4 border-t border-white/5 flex items-center justify-between">
                           <div className="flex flex-col">
                             <span className="text-[10px] font-black uppercase text-muted-foreground">Preço Original</span>
-                            <span className="text-sm font-bold">{formatCurrency(sale.vehicle?.price)}</span>
+                            <span className="text-sm font-bold">{formatCurrency(sale.vehicle?.price ?? 0)}</span>
                           </div>
                           <Badge variant="outline" className="rounded-lg border-white/10 bg-white/5 font-black text-[9px] uppercase tracking-tighter">
                             {sale.vehicle?.status}
@@ -297,8 +335,8 @@ export function SaleDialog({ open, onOpenChange, saleId }: SaleDialogProps) {
                             <span className="text-[9px] font-medium text-white/40">{sale.discount_type === 'PERCENTUAL' ? 'Taxa Percentual' : 'Ajuste Fixo'}</span>
                           </div>
                           <span className="text-xl font-bold tracking-tighter">
-                            {sale.discount_value > 0 ? (
-                              sale.discount_type === 'PERCENTUAL' ? `-${sale.discount_value}%` : `-${formatCurrency(sale.discount_value)}`
+                            {(sale.discount_value ?? 0) > 0 ? (
+                              sale.discount_type === 'PERCENTUAL' ? `-${sale.discount_value}%` : `-${formatCurrency(sale.discount_value ?? 0)}`
                             ) : "—"}
                           </span>
                         </div>
@@ -396,7 +434,10 @@ export function SaleDialog({ open, onOpenChange, saleId }: SaleDialogProps) {
             Fechar
           </Button>
           {sale?.status === 'PENDENTE' && (
-            <Button className="rounded-2xl px-10 font-black shadow-2xl shadow-primary/30 group active:scale-95 transition-all uppercase tracking-tighter text-xs">
+            <Button
+              onClick={() => setTransactionDialogOpen(true)}
+              className="rounded-2xl px-10 font-black shadow-2xl shadow-primary/30 group active:scale-95 transition-all uppercase tracking-tighter text-xs"
+            >
               Registrar Pagamento
               <ChevronRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Button>
@@ -404,5 +445,25 @@ export function SaleDialog({ open, onOpenChange, saleId }: SaleDialogProps) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {sale && (
+      <TransactionDialog
+        open={transactionDialogOpen}
+        onOpenChange={setTransactionDialogOpen}
+        onSuccess={() => {
+          setTransactionDialogOpen(false)
+          fetchSale()
+          onChanged?.()
+        }}
+        vehicle={{
+          id: sale.vehicle?.id?.toString() ?? "",
+          brand: sale.vehicle?.brand ?? "",
+          model: sale.vehicle?.model ?? "",
+          plate: sale.vehicle?.plate ?? "",
+        }}
+        saleId={sale.id}
+        saleValue={Math.max(Number(sale.total_value ?? 0) - Number(sale.total_paid ?? 0), 0)}
+      />
+    )}
+    </>
   )
 }

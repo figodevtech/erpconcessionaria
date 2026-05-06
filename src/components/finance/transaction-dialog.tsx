@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import {
   CalendarClock,
@@ -8,7 +8,9 @@ import {
   FileText,
   Loader2,
   Paperclip,
+  Plus,
   ReceiptText,
+  Search,
   UserRound,
   WalletCards,
   Save,
@@ -19,6 +21,12 @@ import { listCustomersAction } from "@/actions/customers";
 import { createTransactionAction } from "@/actions/transactions";
 import { getTypeCatalogAction } from "@/actions/type-catalog";
 import { Button } from "@/components/ui/button";
+import { CustomerDialog } from "@/app/(app)/clientes/components/customer-dialog";
+import { CustomerSelectorDialog } from "@/app/(app)/clientes/components/customer-selector-dialog";
+import {
+  TypeCreateDialog,
+  type TypeDialogMode,
+} from "@/app/(app)/tipos/components/type-create-dialog";
 import {
   Dialog,
   DialogContent,
@@ -45,14 +53,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox";
 import { formatFileSize } from "@/lib/documents";
 import { formatCpfCnpj, type Customer } from "@/lib/customers";
 import {
@@ -71,7 +71,7 @@ type VehicleOption = {
 type TransactionDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: (updatedVehicle?: any) => void;
+  onSuccess: (updatedVehicle?: unknown) => void;
   vehicle?: VehicleOption | null;
   saleId?: number | null;
   saleValue?: number | null;
@@ -97,14 +97,10 @@ export function TransactionDialog({
   const [paymentMethods, setPaymentMethods] = useState<DynamicPaymentMethod[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [quickTypeDialogMode, setQuickTypeDialogMode] = useState<TypeDialogMode>(null);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [customerSelectorOpen, setCustomerSelectorOpen] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
-  const [customerSearch, setCustomerSearch] = useState("");
-
-  const filteredCustomers = customers.filter(c =>
-    !customerSearch ||
-    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    (c.cpf_cnpj && c.cpf_cnpj.includes(customerSearch))
-  );
 
   const form = useForm<TransactionFormValues>({
     defaultValues: {
@@ -131,6 +127,7 @@ export function TransactionDialog({
   const selectedBankId = useWatch({ control: form.control, name: "banco_id" });
   const selectedCategoryId = useWatch({ control: form.control, name: "categoria_id" });
   const selectedCustomerId = useWatch({ control: form.control, name: "customer_id" });
+  const isSalePayment = !!saleId;
 
   useEffect(() => {
     if (!open) return;
@@ -162,53 +159,88 @@ export function TransactionDialog({
     return () => clearTimeout(timeout);
   }, [form, open, vehicle?.id, saleId, saleValue]);
 
-  useEffect(() => {
-    if (!open) return;
+  const fetchOptions = useCallback(async ({ preserveSelection = false } = {}) => {
+    try {
+      const currentCategoryId = form.getValues("categoria_id");
+      const currentBankId = form.getValues("banco_id");
+      const currentPaymentMethodId = form.getValues("payment_method_id");
 
-    async function fetchOptions() {
-      try {
-        const [typesResult, customersResult] = await Promise.all([
-          getTypeCatalogAction(),
-          listCustomersAction({ page: 1, pageSize: 100, status: "ATIVO" }),
-        ]);
+      const [typesResult, customersResult] = await Promise.all([
+        getTypeCatalogAction(),
+        listCustomersAction({ page: 1, pageSize: 100, status: "ATIVO" }),
+      ]);
 
-        if (typesResult.success && typesResult.data) {
-          const activeCategories = typesResult.data.categories.filter((item) => item.ativo);
-          const activeBanks = typesResult.data.bankAccounts.filter((item) => item.ativo);
-          const activePayments = typesResult.data.paymentMethods.filter((item) => item.ativo);
+      if (typesResult.success && typesResult.data) {
+        const activeCategories = typesResult.data.categories.filter((item) => item.ativo);
+        const activeBanks = typesResult.data.bankAccounts.filter((item) => item.ativo);
+        const activePayments = typesResult.data.paymentMethods.filter((item) => item.ativo);
 
-          setCategories(activeCategories);
-          setBankAccounts(activeBanks);
-          setPaymentMethods(activePayments);
+        setCategories(activeCategories);
+        setBankAccounts(activeBanks);
+        setPaymentMethods(activePayments);
 
-          if (saleId) {
-            const saleCategory = activeCategories.find(c => c.nome.toUpperCase().includes("PAGAMENTO DE VENDA") || c.nome.toUpperCase().includes("VENDA"));
-            if (saleCategory) {
-              form.setValue("categoria_id", saleCategory.id.toString());
-              form.setValue("categoria", saleCategory.nome);
-            } else {
-              form.setValue("categoria", "PAGAMENTO DE VENDA");
-            }
+        if (saleId) {
+          const saleCategory = activeCategories.find(c => c.nome.toUpperCase().includes("PAGAMENTO DE VENDA") || c.nome.toUpperCase().includes("VENDA"));
+          if (saleCategory) {
+            form.setValue("categoria_id", saleCategory.id.toString());
+            form.setValue("categoria", saleCategory.nome);
           } else {
-            form.setValue("categoria_id", activeCategories[0]?.id.toString() ?? "");
-            form.setValue("categoria", activeCategories[0]?.nome ?? "NAO RELACIONADO");
+            form.setValue("categoria", "PAGAMENTO DE VENDA");
           }
-
-          form.setValue("banco_id", activeBanks[0]?.id.toString() ?? "");
-          form.setValue("payment_method_id", activePayments[0]?.id.toString() ?? "");
-          form.setValue("metodo_pagamento", activePayments[0]?.codigo ?? "PIX");
-        }
-
-        if (customersResult.success && customersResult.data) {
-          setCustomers(customersResult.data);
         } else {
-          setCustomers([]);
+          const selectedCategory = activeCategories.find((item) => item.id.toString() === currentCategoryId);
+          const category = preserveSelection ? selectedCategory : null;
+          form.setValue("categoria_id", category?.id.toString() ?? activeCategories[0]?.id.toString() ?? "");
+          form.setValue("categoria", category?.nome ?? activeCategories[0]?.nome ?? "NAO RELACIONADO");
         }
-      } catch { }
+
+        const selectedBank = activeBanks.find((item) => item.id.toString() === currentBankId);
+        form.setValue("banco_id", (preserveSelection ? selectedBank?.id.toString() : null) ?? activeBanks[0]?.id.toString() ?? "");
+
+        const selectedPayment = activePayments.find((item) => item.id.toString() === currentPaymentMethodId);
+        const payment = (preserveSelection ? selectedPayment : null) ?? activePayments[0];
+        form.setValue("payment_method_id", payment?.id.toString() ?? "");
+        form.setValue("metodo_pagamento", payment?.codigo ?? "PIX");
+      }
+
+      if (customersResult.success && customersResult.data) {
+        setCustomers(customersResult.data);
+      } else {
+        setCustomers([]);
+      }
+    } catch { }
+  }, [form, saleId]);
+
+  const fetchCustomers = useCallback(async ({ selectNewest = false } = {}) => {
+    const currentCustomerId = form.getValues("customer_id");
+    const result = await listCustomersAction({ page: 1, pageSize: 100, status: "ATIVO" });
+
+    if (!result.success || !result.data) {
+      setCustomers([]);
+      return;
     }
 
-    fetchOptions();
-  }, [form, open]);
+    setCustomers(result.data);
+
+    const selectedCustomer = selectNewest
+      ? result.data[0]
+      : result.data.find((item) => item.id.toString() === currentCustomerId);
+
+    if (selectedCustomer) {
+      const id = selectedCustomer.id.toString();
+      form.setValue("customer_id", id);
+      form.setValue("nome_pagador", selectedCustomer.name);
+      form.setValue("cpf_cnpj_pagador", formatCpfCnpj(selectedCustomer.cpf_cnpj));
+    }
+  }, [form]);
+
+  useEffect(() => {
+    if (!open) return;
+    const timeout = setTimeout(() => {
+      fetchOptions();
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [fetchOptions, open]);
 
   function onSubmit(values: TransactionFormValues) {
     const formData = new FormData();
@@ -224,11 +256,11 @@ export function TransactionDialog({
     startTransition(async () => {
       const result = await createTransactionAction(formData);
       if (result.success) {
-        toast.success("Transação lançada com sucesso");
+        toast.success("TransaÃ§Ã£o lanÃ§ada com sucesso");
         onSuccess(result.vehicle);
         onOpenChange(false);
       } else {
-        toast.error(result.error ?? "Erro ao criar transação");
+        toast.error(result.error ?? "Erro ao criar transaÃ§Ã£o");
       }
     });
   }
@@ -247,7 +279,15 @@ export function TransactionDialog({
     (item) => item.id.toString() === selectedCustomerId,
   );
 
+  function selectCustomer(customer: Customer) {
+    const id = customer.id.toString();
+    form.setValue("customer_id", id);
+    form.setValue("nome_pagador", customer.name);
+    form.setValue("cpf_cnpj_pagador", formatCpfCnpj(customer.cpf_cnpj));
+    setCustomers((current) => current.some((item) => item.id === customer.id) ? current : [customer, ...current]);
+  }
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-svh w-[100dvw] max-w-[100dvw] flex-col overflow-hidden border-none p-0 shadow-2xl sm:max-h-[min(90vh,850px)] sm:w-[95vw] sm:max-w-[980px]">
         <DialogHeader className="shrink-0 border-b bg-card/50 px-8 py-6 backdrop-blur-md">
@@ -257,10 +297,10 @@ export function TransactionDialog({
             </div>
             <div>
               <DialogTitle className="text-2xl font-bold tracking-tight">
-                Nova transação
+                Nova transaÃ§Ã£o
               </DialogTitle>
               <DialogDescription className="mt-1 text-sm text-muted-foreground">
-                Lance uma receita ou despesa vinculada ao caixa, a uma venda ou a um veículo.
+                Lance uma receita ou despesa vinculada ao caixa, a uma venda ou a um veÃ­culo.
               </DialogDescription>
             </div>
           </div>
@@ -276,7 +316,7 @@ export function TransactionDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange} disabled={isPending}>
+                      <Select value={field.value} onValueChange={field.onChange} disabled={isPending || isSalePayment}>
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <span className="truncate w-full text-left">{selectedTypeLabel || "Selecione"}</span>
@@ -284,7 +324,7 @@ export function TransactionDialog({
                         </FormControl>
                         <SelectContent alignItemWithTrigger={false}>
                           <SelectItem value="RECEITA">Receita</SelectItem>
-                          <SelectItem value="DESPESA">Despesa</SelectItem>
+                          {!isSalePayment && <SelectItem value="DESPESA">Despesa</SelectItem>}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -297,7 +337,7 @@ export function TransactionDialog({
                   name="payment_method_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Método de pagamento</FormLabel>
+                      <FormLabel>MÃ©todo de pagamento</FormLabel>
                       <Select
                         value={field.value || ""}
                         onValueChange={(value) => {
@@ -307,18 +347,32 @@ export function TransactionDialog({
                         }}
                         disabled={isPending}
                       >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <CreditCard className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span className="truncate w-full text-left">
-                              {selectedPayment?.nome || "Selecione"}
-                            </span>
-                          </SelectTrigger>
-                        </FormControl>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <CreditCard className="mr-2 h-4 w-4 text-muted-foreground" />
+                              <span className="truncate w-full text-left">
+                                {selectedPayment?.nome || "Selecione"}
+                              </span>
+                            </SelectTrigger>
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="shrink-0"
+                            onClick={() => setQuickTypeDialogMode("payment")}
+                            disabled={isPending}
+                            title="Novo metodo de pagamento"
+                            aria-label="Novo metodo de pagamento"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
                         <SelectContent alignItemWithTrigger={false}>
                           {paymentMethods.length === 0 ? (
                             <SelectItem value="__empty" disabled>
-                              Cadastre um método em Tipos
+                              Cadastre um mÃ©todo em Tipos
                             </SelectItem>
                           ) : (
                             paymentMethods.map((method) => (
@@ -339,7 +393,7 @@ export function TransactionDialog({
                   name="pendente"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Lançamento futuro</FormLabel>
+                      <FormLabel>LanÃ§amento futuro</FormLabel>
                       <div className="flex h-10 items-center">
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isPending} />
@@ -410,15 +464,29 @@ export function TransactionDialog({
                     <FormItem>
                       <FormLabel>Banco / Conta</FormLabel>
                       <Select value={field.value || ""} onValueChange={field.onChange} disabled={isPending}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <span className="truncate text-left">
-                              {selectedBank
-                                ? `${selectedBank.titulo} - ${bankAccountTypeLabel(selectedBank.tipo)}`
-                                : "Selecione"}
-                            </span>
-                          </SelectTrigger>
-                        </FormControl>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <span className="truncate text-left">
+                                {selectedBank
+                                  ? `${selectedBank.titulo} - ${bankAccountTypeLabel(selectedBank.tipo)}`
+                                  : "Selecione"}
+                              </span>
+                            </SelectTrigger>
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="shrink-0"
+                            onClick={() => setQuickTypeDialogMode("bank")}
+                            disabled={isPending}
+                            title="Novo banco / conta"
+                            aria-label="Novo banco / conta"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
                         <SelectContent alignItemWithTrigger={false}>
                           {bankAccounts.map((account) => (
                             <SelectItem key={account.id} value={account.id.toString()}>
@@ -447,14 +515,30 @@ export function TransactionDialog({
                         }}
                         disabled={isPending || !!saleId}
                       >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span className="truncate w-full text-left">
-                              {selectedCategory?.nome || "Selecione"}
-                            </span>
-                          </SelectTrigger>
-                        </FormControl>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
+                              <span className="truncate w-full text-left">
+                                {selectedCategory?.nome || "Selecione"}
+                              </span>
+                            </SelectTrigger>
+                          </FormControl>
+                          {!saleId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="shrink-0"
+                              onClick={() => setQuickTypeDialogMode("category")}
+                              disabled={isPending}
+                              title="Nova categoria"
+                              aria-label="Nova categoria"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                         <SelectContent alignItemWithTrigger={false}>
                           {categories.map((category) => (
                             <SelectItem key={category.id} value={category.id.toString()}>
@@ -473,11 +557,11 @@ export function TransactionDialog({
                   name="descricao"
                   render={({ field }) => (
                     <FormItem className="md:col-span-3">
-                      <FormLabel>Descrição*</FormLabel>
+                      <FormLabel>DescriÃ§Ã£o*</FormLabel>
                       <FormControl>
                         <Textarea
                           className="min-h-24 resize-none"
-                          placeholder="Descrição"
+                          placeholder="DescriÃ§Ã£o"
                           required
                           disabled={isPending}
                           {...field}
@@ -500,51 +584,43 @@ export function TransactionDialog({
                 <FormField
                   control={form.control}
                   name="customer_id"
-                  render={({ field }) => (
+                  render={() => (
                     <FormItem className="md:col-span-3 flex flex-col">
                       <FormLabel>Cliente cadastrado</FormLabel>
-                      <Combobox
-                        items={customers}
-                        value={customers.find((item) => item.id.toString() === field.value)?.name.toString() || "none"}
-                        onValueChange={(value) => {
-                          const nextValue = value === "none" ? "" : value;
-                          field.onChange(nextValue);
-                          const customer = customers.find((item) => item.id.toString() === nextValue);
-                          if (customer) {
-                            form.setValue("nome_pagador", customer.name);
-                            form.setValue("cpf_cnpj_pagador", formatCpfCnpj(customer.cpf_cnpj));
-                          } else if (value === "none") {
-                            form.setValue("nome_pagador", "");
-                            form.setValue("cpf_cnpj_pagador", "");
-                          }
-                        }}
-                        inputValue={customerSearch}
-                        onInputValueChange={setCustomerSearch}
-                        disabled={isPending}
-                      >
+                      <div className="flex gap-2">
                         <FormControl>
-                          <ComboboxInput
-                            placeholder="Pesquisar cliente por nome ou CPF/CNPJ..."
-                            className="w-full bg-background/50"
+                          <Input
+                            readOnly
+                            value={selectedCustomer ? `${selectedCustomer.name} - ${formatCpfCnpj(selectedCustomer.cpf_cnpj)}` : ""}
+                            placeholder="Nenhum cliente selecionado"
+                            className="bg-background/50"
                           />
                         </FormControl>
-                        <ComboboxContent>
-                          <ComboboxEmpty>Nenhum cliente encontrado.</ComboboxEmpty>
-                          <ComboboxList>
-                            <ComboboxItem value="none" className="text-muted-foreground italic">
-                              Não vincular cliente
-                            </ComboboxItem>
-                            {filteredCustomers.map((customer: any) => (
-                              <ComboboxItem key={customer.id} value={customer.id.toString()}>
-                                <div className="flex flex-col">
-                                  <span>{customer.name}</span>
-                                  <span className="text-xs text-muted-foreground">{formatCpfCnpj(customer.cpf_cnpj)}</span>
-                                </div>
-                              </ComboboxItem>
-                            ))}
-                          </ComboboxList>
-                        </ComboboxContent>
-                      </Combobox>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={() => setCustomerSelectorOpen(true)}
+                          disabled={isPending}
+                          title="Selecionar cliente"
+                          aria-label="Selecionar cliente"
+                        >
+                          <Search className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={() => setCustomerDialogOpen(true)}
+                          disabled={isPending}
+                          title="Novo cliente"
+                          aria-label="Novo cliente"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -594,7 +670,7 @@ export function TransactionDialog({
                             {attachment ? attachment.name : "PDF ou imagem do comprovante"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {attachment ? formatFileSize(attachment.size) : "PDF, JPG, PNG ou WebP até 50MB"}
+                            {attachment ? formatFileSize(attachment.size) : "PDF, JPG, PNG ou WebP atÃ© 50MB"}
                           </p>
                         </div>
                       </div>
@@ -646,7 +722,7 @@ export function TransactionDialog({
                         }
 
                         if (file.size > 50 * 1024 * 1024) {
-                          toast.error("O comprovante deve ter até 50MB.");
+                          toast.error("O comprovante deve ter atÃ© 50MB.");
                           event.target.value = "";
                           setAttachment(null);
                           return;
@@ -671,7 +747,7 @@ export function TransactionDialog({
                 </Button>
                 <Button type="submit" className="rounded-xl px-8 shadow-lg shadow-primary/20" disabled={isPending}>
                   {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Salvar transação
+                  Salvar transaÃ§Ã£o
                 </Button>
               </div>
             </DialogFooter>
@@ -679,5 +755,31 @@ export function TransactionDialog({
         </Form>
       </DialogContent>
     </Dialog>
+    <TypeCreateDialog
+      mode={quickTypeDialogMode}
+      target={null}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setQuickTypeDialogMode(null);
+      }}
+      onSuccess={() => {
+        setQuickTypeDialogMode(null);
+        fetchOptions({ preserveSelection: true });
+      }}
+    />
+    <CustomerDialog
+      open={customerDialogOpen}
+      onOpenChange={setCustomerDialogOpen}
+      customer={null}
+      onSuccess={() => {
+        setCustomerDialogOpen(false);
+        fetchCustomers({ selectNewest: true });
+      }}
+    />
+    <CustomerSelectorDialog
+      open={customerSelectorOpen}
+      onOpenChange={setCustomerSelectorOpen}
+      onSelect={selectCustomer}
+    />
+    </>
   );
 }
