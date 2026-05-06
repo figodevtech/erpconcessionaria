@@ -652,7 +652,7 @@ async function onSubmit(data: VehicleSaleFormValues) {
                 name="payment_method"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>MÃ©todo de Pagamento</FormLabel>
+                    <FormLabel>Método de Pagamento</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
                       <div className="flex gap-2">
                         <FormControl>
@@ -712,9 +712,9 @@ async function onSubmit(data: VehicleSaleFormValues) {
             name="fiscal_observations"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>ObservaÃ§Ãµes Fiscais / Notas</FormLabel>
+                <FormLabel>Observações Fiscais / Notas</FormLabel>
                 <FormControl>
-                  <Textarea className="min-h-[100px]" placeholder="AnotaÃ§Ãµes sobre a venda, notas promissÃ³rias, etc." {...field} disabled={isPending} />
+                  <Textarea className="min-h-[100px]" placeholder="Anotações sobre a venda, notas promissórias, etc." {...field} disabled={isPending} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

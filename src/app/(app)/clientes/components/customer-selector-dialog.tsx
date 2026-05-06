@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { toast } from "sonner";
 import { listCustomersAction } from "@/actions/customers";
 import { Button } from "@/components/ui/button";
@@ -44,12 +44,19 @@ export function CustomerSelectorDialog({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [count, setCount] = useState(0);
-  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasLoadedForOpen, setHasLoadedForOpen] = useState(false);
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
+  const showLoading = open && (!hasLoadedForOpen || isLoading);
 
-  const fetchCustomers = useCallback(() => {
-    startTransition(async () => {
+  useEffect(() => {
+    if (!open) return;
+
+    let ignoreResult = false;
+    const timeout = setTimeout(async () => {
+      setIsLoading(true);
+
       const result = await listCustomersAction({
         page,
         pageSize,
@@ -57,34 +64,49 @@ export function CustomerSelectorDialog({
         status: "ATIVO",
       });
 
+      if (ignoreResult) return;
+
       if (result.success) {
         setCustomers(result.data ?? []);
         setCount(result.count ?? 0);
       } else {
+        setCustomers([]);
+        setCount(0);
         toast.error(result.error ?? "Erro ao carregar clientes");
       }
-    });
-  }, [page, search]);
 
-  useEffect(() => {
-    if (!open) return;
-    const timeout = setTimeout(fetchCustomers, 250);
-    return () => clearTimeout(timeout);
-  }, [fetchCustomers, open]);
+      setHasLoadedForOpen(true);
+      setIsLoading(false);
+    }, 250);
+
+    return () => {
+      ignoreResult = true;
+      clearTimeout(timeout);
+    };
+  }, [open, page, pageSize, search]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      setHasLoadedForOpen(false);
+      setIsLoading(false);
+    }
+
+    onOpenChange(nextOpen);
+  }
 
   function handleSelect(customer: Customer) {
     onSelect(customer);
-    onOpenChange(false);
+    handleOpenChange(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col overflow-hidden">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="flex min-h-120 flex-col overflow-hidden">
         <DialogHeader className="border-b">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <DialogTitle>Selecione um cliente</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-xs">Selecione um cliente</DialogTitle>
+              <DialogDescription className={"text-xs"}>
                 Pesquise e clique em um cliente para selecionar.
               </DialogDescription>
             </div>
@@ -108,8 +130,8 @@ export function CustomerSelectorDialog({
         </div>
 
         <ScrollArea className="min-h-0 flex-1">
-          <div className="text-xs">
-            <Table>
+          <div >
+            <Table className="text-[10px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-20">ID</TableHead>
@@ -120,7 +142,7 @@ export function CustomerSelectorDialog({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isPending ? (
+                {showLoading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                       Carregando clientes...
@@ -144,13 +166,13 @@ export function CustomerSelectorDialog({
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{customer.name}</div>
-                        <div className="text-xs text-muted-foreground">{customer.city}/{customer.state}</div>
+                        <div className="text-muted-foreground">{customer.city}/{customer.state}</div>
                       </TableCell>
                       <TableCell>{formatCpfCnpj(customer.cpf_cnpj)}</TableCell>
                       <TableCell>{customerPersonTypeLabel(customer.person_type)}</TableCell>
                       <TableCell>
-                        <div className="text-sm">{customer.email}</div>
-                        <div className="text-xs text-muted-foreground">{formatPhone(customer.phone)}</div>
+                        <div >{customer.email}</div>
+                        <div className="text-muted-foreground">{formatPhone(customer.phone)}</div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -170,7 +192,7 @@ export function CustomerSelectorDialog({
               variant="outline"
               size="icon"
               onClick={() => setPage((value) => Math.max(1, value - 1))}
-              disabled={page <= 1 || isPending}
+              disabled={page <= 1 || showLoading}
               aria-label="Pagina anterior"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -183,7 +205,7 @@ export function CustomerSelectorDialog({
               variant="outline"
               size="icon"
               onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-              disabled={page >= totalPages || isPending}
+              disabled={page >= totalPages || showLoading}
               aria-label="Proxima pagina"
             >
               <ChevronRight className="h-4 w-4" />
