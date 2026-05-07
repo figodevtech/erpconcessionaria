@@ -104,6 +104,7 @@ export type TransactionFilters = {
   search?: string;
   tipo?: "TODOS" | TransactionType;
   vehicleId?: number;
+  bankId?: number;
 };
 
 export type TransactionKpis = {
@@ -113,6 +114,7 @@ export type TransactionKpis = {
   totalDespesasVenda: number;
   saldo: number;
   pendentes: number;
+  valorPendente: number;
 };
 
 export function paymentMethodLabel(method: PaymentMethod) {

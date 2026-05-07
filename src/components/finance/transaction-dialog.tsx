@@ -297,7 +297,7 @@ export function TransactionDialog({
             </div>
             <div>
               <DialogTitle className="text-2xl font-bold tracking-tight">
-                Nova transaÃ§Ã£o
+                Nova transação
               </DialogTitle>
               <DialogDescription className="mt-1 text-sm text-muted-foreground">
                 Lance uma receita ou despesa vinculada ao caixa, a uma venda ou a um veÃ­culo.
@@ -337,7 +337,7 @@ export function TransactionDialog({
                   name="payment_method_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>MÃ©todo de pagamento</FormLabel>
+                      <FormLabel>Método de pagamento</FormLabel>
                       <Select
                         value={field.value || ""}
                         onValueChange={(value) => {
@@ -393,7 +393,7 @@ export function TransactionDialog({
                   name="pendente"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>LanÃ§amento futuro</FormLabel>
+                      <FormLabel>Lançamento futuro</FormLabel>
                       <div className="flex h-10 items-center">
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isPending} />
@@ -539,9 +539,9 @@ export function TransactionDialog({
                             </Button>
                           )}
                         </div>
-                        <SelectContent alignItemWithTrigger={false}>
+                        <SelectContent  alignItemWithTrigger={false}>
                           {categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id.toString()}>
+                            <SelectItem className="hover:cursor-pointer" key={category.id} value={category.id.toString()}>
                               {category.nome}
                             </SelectItem>
                           ))}
@@ -557,11 +557,11 @@ export function TransactionDialog({
                   name="descricao"
                   render={({ field }) => (
                     <FormItem className="md:col-span-3">
-                      <FormLabel>DescriÃ§Ã£o*</FormLabel>
+                      <FormLabel>Descrição*</FormLabel>
                       <FormControl>
                         <Textarea
                           className="min-h-24 resize-none"
-                          placeholder="DescriÃ§Ã£o"
+                          placeholder="Descrição"
                           required
                           disabled={isPending}
                           {...field}
@@ -747,7 +747,7 @@ export function TransactionDialog({
                 </Button>
                 <Button type="submit" className="rounded-xl px-8 shadow-lg shadow-primary/20" disabled={isPending}>
                   {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Salvar transaÃ§Ã£o
+                  Salvar transação
                 </Button>
               </div>
             </DialogFooter>

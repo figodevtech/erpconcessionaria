@@ -136,6 +136,10 @@ export async function listTransactionsAction(
     query = query.eq("vehicle_id", filters.vehicleId);
   }
 
+  if (filters.bankId) {
+    query = query.eq("banco_id", filters.bankId);
+  }
+
   if (filters.tipo && filters.tipo !== "TODOS") {
     query = query.eq("tipo", filters.tipo);
   }
@@ -181,22 +185,26 @@ export async function getTransactionKpisAction(
   if (error) return { success: false, error: error.message };
 
   const rows = data ?? [];
-  const totalReceitas = rows
+  const settledRows = rows.filter((row) => !row.pendente);
+  const pendingRows = rows.filter((row) => row.pendente);
+
+  const totalReceitas = settledRows
     .filter((row) => row.tipo === "RECEITA")
     .reduce((acc, row) => acc + Number(row.valor ?? 0), 0);
-  const totalDespesas = rows
+  const totalDespesas = settledRows
     .filter((row) => row.tipo === "DESPESA")
     .reduce((acc, row) => acc + Number(row.valor ?? 0), 0);
   
-  const totalReceitasVenda = rows
+  const totalReceitasVenda = settledRows
     .filter((row) => row.tipo === "RECEITA" && row.venda_id !== null)
     .reduce((acc, row) => acc + Number(row.valor ?? 0), 0);
   
-  const totalDespesasVenda = rows
+  const totalDespesasVenda = settledRows
     .filter((row) => row.tipo === "DESPESA" && row.venda_id !== null)
     .reduce((acc, row) => acc + Number(row.valor ?? 0), 0);
 
-  const pendentes = rows.filter((row) => row.pendente).length;
+  const pendentes = pendingRows.length;
+  const valorPendente = pendingRows.reduce((acc, row) => acc + Number(row.valor ?? 0), 0);
 
   return {
     success: true,
@@ -207,6 +215,7 @@ export async function getTransactionKpisAction(
       totalDespesasVenda,
       saldo: totalReceitas - totalDespesas,
       pendentes,
+      valorPendente,
     },
   };
 }
@@ -413,6 +422,7 @@ export async function createTransactionAction(
   }
 
   revalidatePath("/financeiro");
+  revalidatePath("/bancos");
   revalidatePath("/veiculos");
   revalidatePath("/vendas");
 
@@ -520,6 +530,7 @@ export async function softDeleteTransactionAction(id: number) {
   }
 
   revalidatePath("/financeiro");
+  revalidatePath("/bancos");
   revalidatePath("/veiculos");
   revalidatePath("/vendas");
   return { success: true, vehicle: updatedVehicle };

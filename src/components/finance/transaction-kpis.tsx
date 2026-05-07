@@ -12,14 +12,14 @@ export function TransactionKpis({ data }: { data: TransactionKpis }) {
       value: formatCurrency(data.totalReceitas),
       icon: ArrowUpCircle,
       className: "text-emerald-600",
-      hint: "Entradas registradas",
+      hint: "Entradas liquidadas",
     },
     {
       title: "Despesas",
       value: formatCurrency(data.totalDespesas),
       icon: ArrowDownCircle,
       className: "text-red-600",
-      hint: "Saídas registradas",
+      hint: "Saidas liquidadas",
     },
     {
       title: "Saldo",
@@ -30,10 +30,10 @@ export function TransactionKpis({ data }: { data: TransactionKpis }) {
     },
     {
       title: "Pendentes",
-      value: data.pendentes.toString(),
+      value: formatCurrency(data.valorPendente),
       icon: Clock3,
       className: "text-amber-600",
-      hint: "Lançamentos em aberto",
+      hint: `${data.pendentes} lancamentos em aberto`,
     },
   ];
 

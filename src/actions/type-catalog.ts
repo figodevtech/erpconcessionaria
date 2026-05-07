@@ -30,6 +30,7 @@ function parseMoney(value?: string | null) {
 function revalidateTypes() {
   revalidatePath("/tipos");
   revalidatePath("/financeiro");
+  revalidatePath("/bancos");
   revalidatePath("/veiculos");
 }
 

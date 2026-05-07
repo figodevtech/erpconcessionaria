@@ -189,7 +189,7 @@ export function UserDialog({
                   />
                 )}
 
-                <FormField
+                {/* <FormField
                   control={form.control}
                   name="commission_percent"
                   render={({ field }) => (
@@ -213,7 +213,7 @@ export function UserDialog({
                       <FormMessage />
                     </FormItem>
                   )}
-                />
+                /> */}
 
                 <FormField
                   control={form.control}

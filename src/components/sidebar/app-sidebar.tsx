@@ -15,7 +15,8 @@ import {
   Globe,
   WalletCards,
   Layers3,
-  Handshake
+  Handshake,
+  Building2
 } from "lucide-react";
 import { NavMain } from "./components/nav-main";
 import { NavSettings } from "./components/nav-settings";
@@ -63,6 +64,12 @@ const data = {
       title: "Fluxo de Caixa",
       url: "/financeiro",
       icon: WalletCards,
+      slug: "finance:view",
+    },
+    {
+      title: "Bancos",
+      url: "/bancos",
+      icon: Building2,
       slug: "finance:view",
     },
     {

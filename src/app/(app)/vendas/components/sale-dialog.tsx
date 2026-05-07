@@ -282,7 +282,7 @@ export function SaleDialog({ open, onOpenChange, saleId, onChanged }: SaleDialog
                           <span className="text-sm font-bold">{sale.payment_method || "Não Definido"}</span>
                         </div>
                       </div>
-                      <div className="space-y-2">
+                      {/* <div className="space-y-2">
                         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Taxa de Comissão</p>
                         <div className="flex items-center gap-2">
                           <div className="h-2 w-16 bg-white/5 rounded-full overflow-hidden">
@@ -293,7 +293,7 @@ export function SaleDialog({ open, onOpenChange, saleId, onChanged }: SaleDialog
                           </div>
                           <span className="text-sm font-black text-primary">{sale.commission_percent_applied ? `${sale.commission_percent_applied}%` : "0%"}</span>
                         </div>
-                      </div>
+                      </div> */}
                     </div>
 
                     {sale.fiscal_observations && (
