@@ -2380,7 +2380,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
       const { error: uploadError } = await supabase.storage
         .from('vehicles')
         .upload(filePath, file, {
-          upsert: true,
+          upsert: false,
         });
 
       if (uploadError) throw uploadError;
@@ -2746,7 +2746,7 @@ function MediaTab({
         const { error: uploadError } = await supabase.storage
           .from('vehicles')
           .upload(filePath, compressedFile, {
-            upsert: true,
+            upsert: false,
           });
 
         if (uploadError) throw uploadError;
