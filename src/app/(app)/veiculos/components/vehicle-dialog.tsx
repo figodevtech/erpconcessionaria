@@ -160,6 +160,31 @@ export interface VehicleFormValues {
   renavam?: string | null;
 }
 
+type FipeOption = { code: string; name: string };
+
+function normalizeFipeOptions(data: unknown): FipeOption[] {
+  const items =
+    Array.isArray(data)
+      ? data
+      : data && typeof data === "object"
+        ? Array.isArray((data as { models?: unknown }).models)
+          ? (data as { models: unknown[] }).models
+          : Array.isArray((data as { modelos?: unknown }).modelos)
+            ? (data as { modelos: unknown[] }).modelos
+            : Array.isArray((data as { value?: unknown }).value)
+              ? (data as { value: unknown[] }).value
+              : []
+        : [];
+
+  return items.filter(
+    (item): item is FipeOption =>
+      item !== null &&
+      typeof item === "object" &&
+      typeof (item as FipeOption).code === "string" &&
+      typeof (item as FipeOption).name === "string",
+  );
+}
+
 interface VehicleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -359,23 +384,43 @@ export function VehicleDialog({
   const modelValue = form.watch("model");
 
   useEffect(() => {
+    const controller = new AbortController();
+    let ignore = false;
+
     async function fetchBrands() {
       if (!typeValue) return;
+      setFipeBrands([]);
+      setFipeModels([]);
+      setFipeBaseModels([]);
+      setFipeVersions([]);
       setLoadingFipe(true);
       try {
-        const res = await fetch(`https://fipe.parallelum.com.br/api/v2/${typeValue}/brands`);
+        const res = await fetch(`https://fipe.parallelum.com.br/api/v2/${typeValue}/brands`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("Erro ao consultar marcas na FIPE.");
         const data = await res.json();
-        setFipeBrands(data);
+        if (!ignore) setFipeBrands(normalizeFipeOptions(data));
       } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
         console.error("Error fetching FIPE brands:", error);
+        if (!ignore) setFipeBrands([]);
       } finally {
-        setLoadingFipe(false);
+        if (!ignore) setLoadingFipe(false);
       }
     }
     fetchBrands();
+
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
   }, [typeValue]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let ignore = false;
+
     async function fetchModels() {
       if (!brandValue || fipeBrands.length === 0) {
         setFipeModels([]);
@@ -385,29 +430,48 @@ export function VehicleDialog({
       }
       const selectedBrand = fipeBrands.find(b => b.name.toLowerCase() === brandValue.toLowerCase());
       if (!selectedBrand) {
+        setFipeModels([]);
+        setFipeBaseModels([]);
+        setFipeVersions([]);
         return;
       }
 
       setLoadingFipe(true);
       try {
-        const res = await fetch(`https://fipe.parallelum.com.br/api/v2/${typeValue}/brands/${selectedBrand.code}/models`);
+        const res = await fetch(`https://fipe.parallelum.com.br/api/v2/${typeValue}/brands/${selectedBrand.code}/models`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("Erro ao consultar modelos na FIPE.");
         const data = await res.json();
-        setFipeModels(data);
+        const models = normalizeFipeOptions(data);
+        if (ignore) return;
+        setFipeModels(models);
 
         // Derive base models: first word
         const bases = new Set<string>();
-        data.forEach((m: any) => {
+        models.forEach((m) => {
           const firstWord = m.name.split(" ")[0];
           bases.add(firstWord);
         });
         setFipeBaseModels(Array.from(bases).sort());
       } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
         console.error("Error fetching FIPE models:", error);
+        if (!ignore) {
+          setFipeModels([]);
+          setFipeBaseModels([]);
+          setFipeVersions([]);
+        }
       } finally {
-        setLoadingFipe(false);
+        if (!ignore) setLoadingFipe(false);
       }
     }
     fetchModels();
+
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
   }, [typeValue, brandValue, fipeBrands]);
 
   useEffect(() => {
