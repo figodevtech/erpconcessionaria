@@ -235,7 +235,9 @@ CREATE TABLE IF NOT EXISTS "public"."app_settings" (
     "ai_description_usage_count" integer DEFAULT 0,
     "ai_description_last_reset" "date" DEFAULT CURRENT_DATE,
     "banner_interval" numeric(10,2) DEFAULT 6000,
-    "banner_duration" numeric(10,2) DEFAULT 40
+    "banner_duration" numeric(10,2) DEFAULT 40,
+    "primary_color" "text" DEFAULT '#1a2744'::"text" NOT NULL,
+    "secondary_color" "text" DEFAULT '#f1f3f7'::"text" NOT NULL
 );
 
 
@@ -1913,8 +1915,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
-
 
 
 

@@ -1,6 +1,16 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+type UserProfileResult = {
+  profile?: {
+    name?: string | null
+  } | null
+}
+
+type RolePermissionResult = {
+  permission_slug: string | null
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -15,7 +25,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -49,7 +59,7 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const roleName = (profile as any)?.profile?.name
+    const roleName = (profile as UserProfileResult | null)?.profile?.name
     const pathname = request.nextUrl.pathname
 
     // Skip redirect for Administrador
@@ -62,7 +72,9 @@ export async function updateSession(request: NextRequest) {
       .select('permission_slug')
       .eq('role_name', roleName || '')
 
-    const permissions = rolePermissions?.map((p: any) => p.permission_slug) || []
+    const permissions = (rolePermissions as RolePermissionResult[] | null)?.flatMap((permission) =>
+      permission.permission_slug ? [permission.permission_slug] : [],
+    ) || []
     
     // We already have granular checks on the pages. 
     // Middleware should only handle basic top-level redirects if needed.
@@ -73,7 +85,12 @@ export async function updateSession(request: NextRequest) {
     }
 
     for (const [route, slug] of Object.entries(routePermissions)) {
-      if (pathname.startsWith(route) && !permissions.includes(slug) && !permissions.includes("admin")) {
+      const hasRoutePermission =
+        permissions.includes(slug) ||
+        permissions.includes("admin") ||
+        (route === "/configuracoes" && permissions.some((permission) => permission.startsWith("settings:")))
+
+      if (pathname.startsWith(route) && !hasRoutePermission) {
         const url = request.nextUrl.clone()
         url.pathname = '/dashboard'
         return NextResponse.redirect(url)

@@ -12,7 +12,7 @@ interface Permission {
   action: string
 }
 
-import { LayoutDashboard, DollarSign, Settings, Users, Car, Shield, type LucideIcon } from "lucide-react"
+import { LayoutDashboard, DollarSign, Settings, Users, Car, Shield, Globe, type LucideIcon } from "lucide-react"
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -26,6 +26,7 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   clientes: Users,
   vehicles: Car,
   veiculos: Car,
+  site: Globe,
 }
 
 export function ProfilePermissionsMatrix({
