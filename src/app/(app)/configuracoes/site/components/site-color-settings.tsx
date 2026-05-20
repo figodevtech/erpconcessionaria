@@ -137,7 +137,7 @@ export function SiteColorSettings() {
         <CardHeader className="border-b">
           
               <CardTitle>Definir</CardTitle>
-              <CardDescription>Defina as cores do site.</CardDescription>
+              <CardDescription>Defina as cores do site. </CardDescription>
           
         </CardHeader>
         <CardContent className="space-y-5 p-6">
