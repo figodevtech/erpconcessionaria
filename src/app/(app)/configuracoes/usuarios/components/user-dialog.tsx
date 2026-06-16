@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useEffect, useTransition } from "react"
+import { useForm, useWatch } from "react-hook-form"
 import {
   Dialog,
   DialogContent,
@@ -25,9 +25,8 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select"
-import { Loader2, User, Mail, Shield, CheckCircle2, Percent } from "lucide-react"
+import { Loader2, User, Mail, Shield, CheckCircle2, LockKeyhole } from "lucide-react"
 import { createUserAction } from "@/actions/users"
 import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -36,9 +35,34 @@ import { usePermissions } from "@/hooks/use-permissions"
 interface UserDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  user?: any | null
-  profiles: any[]
+  user?: UserProfile | null
+  profiles: Profile[]
   onSuccess: () => void
+}
+
+interface Profile {
+  id: number
+  name: string
+  description?: string
+}
+
+interface UserProfile {
+  id: string
+  email: string
+  name: string
+  profile_id: number
+  commission_percent?: number | null
+  profile?: {
+    name: string
+  }
+}
+
+type UserFormValues = {
+  name: string
+  email: string
+  password: string
+  profile_id: string
+  commission_percent: string
 }
 
 export function UserDialog({
@@ -49,11 +73,11 @@ export function UserDialog({
   onSuccess,
 }: UserDialogProps) {
   const { hasPermission } = usePermissions()
-  const canUpdate = hasPermission("settings:users:update")
   const [isPending, startTransition] = useTransition()
   const isEditing = !!user
+  const canManage = hasPermission(isEditing ? "settings:users:update" : "settings:users:create")
 
-  const form = useForm({
+  const form = useForm<UserFormValues>({
     defaultValues: {
       name: "",
       email: "",
@@ -61,6 +85,11 @@ export function UserDialog({
       profile_id: "",
       commission_percent: "",
     },
+  })
+
+  const selectedProfileId = useWatch({
+    control: form.control,
+    name: "profile_id",
   })
 
   useEffect(() => {
@@ -85,7 +114,12 @@ export function UserDialog({
     }
   }, [open, user, form])
 
-  async function onSubmit(data: any) {
+  const selectedProfileName =
+    profiles.find((profile) => profile.id.toString() === selectedProfileId)?.name ||
+    user?.profile?.name ||
+    ""
+
+  async function onSubmit(data: UserFormValues) {
     const formData = new FormData()
     Object.entries(data).forEach(([key, value]) => {
       formData.append(key, value as string)
@@ -141,7 +175,7 @@ export function UserDialog({
                       <FormControl>
                         <div className="relative">
                           <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input placeholder="João Silva" className="pl-9" {...field} required disabled={isPending || !canUpdate} />
+                          <Input placeholder="João Silva" className="pl-9" {...field} required disabled={isPending || !canManage} />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -164,7 +198,7 @@ export function UserDialog({
                             className="pl-9"
                             {...field}
                             required
-                            disabled={isEditing || isPending || !canUpdate}
+                            disabled={isEditing || isPending || !canManage}
                           />
                         </div>
                       </FormControl>
@@ -173,21 +207,30 @@ export function UserDialog({
                   )}
                 />
 
-                {!isEditing && (
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Senha Temporária</FormLabel>
-                        <FormControl>
-                          <Input type="password" {...field} required disabled={isPending || !canUpdate} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isEditing ? "Nova Senha" : "Senha Temporária"}</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <LockKeyhole className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="password"
+                            placeholder={isEditing ? "Deixe em branco para manter" : "Mínimo 6 caracteres"}
+                            className="pl-9"
+                            {...field}
+                            required={!isEditing}
+                            minLength={field.value ? 6 : undefined}
+                            disabled={isPending || !canManage}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 {/* <FormField
                   control={form.control}
@@ -206,7 +249,7 @@ export function UserDialog({
                             placeholder="Ex: 5.5"
                             className="pl-9"
                             {...field}
-                            disabled={isPending || !canUpdate}
+                            disabled={isPending || !canManage}
                           />
                         </div>
                       </FormControl>
@@ -221,11 +264,13 @@ export function UserDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Perfil de Acesso</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isPending || !canUpdate}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isPending || !canManage}>
                         <FormControl>
                           <SelectTrigger className="pl-9 relative">
                             <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <SelectValue placeholder="Selecione um cargo" />
+                            <span className="flex flex-1 items-center text-left">
+                              {selectedProfileName || "Selecione um cargo"}
+                            </span>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent alignItemWithTrigger={false}>
@@ -254,7 +299,7 @@ export function UserDialog({
                 >
                   Cancelar
                 </Button>
-                {canUpdate && (
+                {canManage && (
                   <Button
                     type="submit"
                     disabled={isPending}

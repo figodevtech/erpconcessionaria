@@ -1,11 +1,12 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { checkPermission } from "@/utils/permissions"
 
 export async function createUserAction(formData: FormData) {
   const idValue = formData.get("id") as string | null
   const email = formData.get("email") as string
-  const password = formData.get("password") as string
+  const password = ((formData.get("password") as string | null) || "").trim()
   const name = formData.get("name") as string
   const profile_id_raw = formData.get("profile_id") as string
   const profile_id = parseInt(profile_id_raw)
@@ -14,6 +15,20 @@ export async function createUserAction(formData: FormData) {
 
   if (isNaN(profile_id)) {
     return { error: "O cargo (perfil) é obrigatório." }
+  }
+
+  const isEditing = Boolean(idValue)
+  const allowed = await checkPermission(isEditing ? "settings:users:update" : "settings:users:create")
+  if (!allowed) {
+    return { error: "Voce nao tem permissao para gerenciar usuarios." }
+  }
+
+  if (!isEditing && password.length < 6) {
+    return { error: "A senha deve ter pelo menos 6 caracteres." }
+  }
+
+  if (isEditing && password && password.length < 6) {
+    return { error: "A nova senha deve ter pelo menos 6 caracteres." }
   }
 
   const { createAdminClient } = await import("@/utils/supabase/server")
@@ -27,9 +42,15 @@ export async function createUserAction(formData: FormData) {
 
   if (userId) {
     // --- UPDATE FLOW ---
-    const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+    const authUpdate: { user_metadata: { name: string }; password?: string } = {
       user_metadata: { name }
-    })
+    }
+
+    if (password) {
+      authUpdate.password = password
+    }
+
+    const { error: authError } = await supabase.auth.admin.updateUserById(userId, authUpdate)
     if (authError) return { error: "Auth Update: " + authError.message }
 
     const { error: profileError } = await supabase
