@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { checkPermission } from "@/utils/permissions";
+import { isVehicleAvailableStatus } from "@/lib/vehicle-status";
 
 export type VehicleKpisData = {
   totalVehicles: number;
@@ -29,7 +30,7 @@ export async function getVehicleKpisAction(): Promise<ActionResult<VehicleKpisDa
   if (error) return { success: false, error: error.message };
 
   const activeVehicles = data || [];
-  const availableVehicles = activeVehicles.filter((vehicle) => vehicle.status === "Em venda");
+  const availableVehicles = activeVehicles.filter((vehicle) => isVehicleAvailableStatus(vehicle.status));
   const availableCount = availableVehicles.length;
   const totalAvailableValue = availableVehicles.reduce((acc, vehicle) => acc + Number(vehicle.price || 0), 0);
 

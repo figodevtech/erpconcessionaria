@@ -14,7 +14,7 @@ export function VehicleKpiCards({ data }: { data: DashboardKPIs }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
       
-      {/* Veículos em Estoque (Em venda) */}
+      {/* Veículos em Estoque */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="tracking-tight text-sm font-medium">Veículos em Estoque</CardTitle>
@@ -23,7 +23,7 @@ export function VehicleKpiCards({ data }: { data: DashboardKPIs }) {
         <CardContent>
           <div className="text-2xl font-bold">{data.totalVehicles}</div>
           <p className="text-xs text-muted-foreground mt-1 cursor-default">
-            Status: "Em venda"
+            Status: Em venda e Repasse
           </p>
         </CardContent>
       </Card>
@@ -53,7 +53,7 @@ export function VehicleKpiCards({ data }: { data: DashboardKPIs }) {
         <CardContent>
           <div className="text-2xl font-bold">{data.vehiclesSold}</div>
           <p className="text-xs text-muted-foreground mt-1 cursor-default">
-            Status: "Vendido"
+            Status: Vendido
           </p>
         </CardContent>
       </Card>
@@ -67,7 +67,7 @@ export function VehicleKpiCards({ data }: { data: DashboardKPIs }) {
         <CardContent>
           <div className="text-2xl font-bold">{data.vehiclesPendingPayment}</div>
           <p className="text-xs text-muted-foreground mt-1 cursor-default">
-            Status: "Pagamento"
+            Status: Pagamento
           </p>
         </CardContent>
       </Card>

@@ -5,6 +5,7 @@ import { VehicleBrandChart } from "./components/vehicle-brand-chart"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { checkPermission } from "@/utils/permissions"
 import { AccessDenied } from "@/components/access-denied"
+import { isVehicleAvailableStatus } from "@/lib/vehicle-status"
 
 export default async function Dashboard() {
   const hasViewPermission = await checkPermission("dashboard:view")
@@ -21,9 +22,9 @@ export default async function Dashboard() {
   const activeVehicles = vehicles || []
 
   // Calcular KPIs
-  const totalVehicles = activeVehicles.filter(v => v.status === "Em venda").length
+  const totalVehicles = activeVehicles.filter(v => isVehicleAvailableStatus(v.status)).length
   const totalStockValue = activeVehicles
-    .filter(v => v.status === "Em venda")
+    .filter(v => isVehicleAvailableStatus(v.status))
     .reduce((acc, v) => acc + (v.price || 0), 0)
   const vehiclesSold = activeVehicles.filter(v => v.status === "Vendido").length
   const vehiclesPendingPayment = activeVehicles.filter(v => v.status === "Pagamento").length
@@ -49,7 +50,7 @@ export default async function Dashboard() {
 
   // Preparar dados para o gráfico de Marcas
   const brandCounts = activeVehicles
-    .filter(v => v.status === "Em venda") // Foco no estoque atual para marcas
+    .filter(v => isVehicleAvailableStatus(v.status)) // Foco no estoque atual para marcas
     .reduce((acc, v) => {
       const brand = v.brand || "Desconhecida";
       acc[brand] = (acc[brand] || 0) + 1;

@@ -55,12 +55,14 @@ export function VehicleTable({
     switch (status) {
       case "Em venda":
         return "bg-blue-500/10 text-blue-500";
+      case "Repasse":
+        return "bg-orange-500/10 text-orange-500";
       case "Em breve":
         return "bg-purple-500/10 text-purple-500";
       case "Vendido":
         return "bg-green-500/10 text-green-500";
       case "Rascunho":
-        return "bg-orange-500/10 text-orange-500";
+        return "bg-gray-500/10 text-gray-500";
       case "Pagamento":
         return "bg-yellow-500/10 text-yellow-500";
       default:

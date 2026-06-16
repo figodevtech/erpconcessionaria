@@ -123,6 +123,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { VehicleFinanceTab } from "./vehicle-finance-tab";
 import { VehicleAttachmentsTab } from "./vehicle-attachments-tab";
 import { VehicleSaleTab } from "./vehicle-sale-tab";
+import type { VehicleStatus } from "@/lib/vehicle-status";
 
 export interface VehicleFormValues {
   type: string;
@@ -153,7 +154,7 @@ export interface VehicleFormValues {
   engine_size?: string | null;
   horsepower?: number | null;
   is_new: boolean;
-  status: "Em venda" | "Em breve" | "Vendido" | "Rascunho" | "Pagamento";
+  status: VehicleStatus;
   featured: boolean;
   plate: string;
   chassi?: string | null;
@@ -1117,6 +1118,7 @@ function GeneralTab({
                     </FormControl>
                     <SelectContent alignItemWithTrigger={false}>
                       <SelectItem value="Em venda">Em venda</SelectItem>
+                      <SelectItem value="Repasse">Repasse</SelectItem>
                       <SelectItem value="Em breve">Em breve</SelectItem>
                       <SelectItem value="Vendido">Vendido</SelectItem>
                       <SelectItem value="Rascunho">Rascunho</SelectItem>

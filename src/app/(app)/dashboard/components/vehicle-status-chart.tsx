@@ -22,6 +22,10 @@ const chartConfig = {
     label: "Em venda",
     color: "hsl(var(--primary))",
   },
+  "Repasse": {
+    label: "Repasse",
+    color: "hsl(var(--primary))",
+  },
   "Vendido": {
     label: "Vendido",
     color: "hsl(var(--primary))",

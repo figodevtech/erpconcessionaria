@@ -48,6 +48,7 @@ interface VehicleCardProps {
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Em venda":
+    case "Repasse":
       return "bg-blue-500/10 text-blue-500";
     case "Em breve":
       return "bg-purple-500/10 text-purple-500";

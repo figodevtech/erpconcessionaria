@@ -52,6 +52,7 @@ export function VehicleFilters({ search, setSearch, status, setStatus, setPage }
             <SelectContent alignItemWithTrigger={false} align="end">
               <SelectItem className="hover:cursor-pointer" value="Todos">Todos os Status</SelectItem>
               <SelectItem className="hover:cursor-pointer" value="Em venda">Em venda</SelectItem>
+              <SelectItem className="hover:cursor-pointer" value="Repasse">Repasse</SelectItem>
               <SelectItem className="hover:cursor-pointer" value="Em breve">Em breve</SelectItem>
               <SelectItem className="hover:cursor-pointer" value="Vendido">Vendido</SelectItem>
               <SelectItem className="hover:cursor-pointer" value="Rascunho">Rascunho</SelectItem>

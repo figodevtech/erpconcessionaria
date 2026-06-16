@@ -11,9 +11,9 @@ import { Switch } from "@/components/ui/switch"
 import { motion, AnimatePresence } from "framer-motion"
 import { VehicleDialog } from "./vehicle-dialog"
 import { usePermissions } from "@/hooks/use-permissions"
+import type { VehicleStatus } from "@/lib/vehicle-status";
 
 export type SellerType = "dealership" | "store" | "private";
-export type VehicleStatus = "Em venda" | "Em breve" | "Vendido" | "Rascunho" | "Pagamento";
 
 export interface Vehicle {
   id: string;

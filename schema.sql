@@ -140,6 +140,7 @@ ALTER TYPE "public"."tipos_transacao" OWNER TO "postgres";
 
 CREATE TYPE "public"."vehicle_status" AS ENUM (
     'Em venda',
+    'Repasse',
     'Em breve',
     'Vendido',
     'Rascunho',
