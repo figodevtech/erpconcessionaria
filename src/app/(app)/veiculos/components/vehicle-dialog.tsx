@@ -124,6 +124,8 @@ import { VehicleFinanceTab } from "./vehicle-finance-tab";
 import { VehicleAttachmentsTab } from "./vehicle-attachments-tab";
 import { VehicleSaleTab } from "./vehicle-sale-tab";
 import type { VehicleStatus } from "@/lib/vehicle-status";
+import { InstagramImporter } from "@/components/instagram/InstagramImporter";
+import type { InstagramImportedImage } from "@/types/instagram";
 
 export interface VehicleFormValues {
   type: string;
@@ -2776,6 +2778,23 @@ function MediaTab({
     }
   };
 
+  const handleInstagramImported = async (imported: InstagramImportedImage[]) => {
+    const importedVehicleImages = imported
+      .map((item) => item.vehicleImage)
+      .filter(Boolean);
+
+    if (importedVehicleImages.length > 0) {
+      onImagesChange((prev) => [...prev, ...importedVehicleImages]);
+
+      const firstImported = importedVehicleImages[0] as { image_url?: string; url?: string };
+      if (!form.getValues("image") && (firstImported.image_url || firstImported.url)) {
+        form.setValue("image", firstImported.image_url || firstImported.url);
+      }
+    }
+
+    await refreshImages();
+  };
+
   const uploadImages = async () => {
     const pendingImages = mixedImages.filter(img => img.isLocal && img.status !== 'success');
     if (pendingImages.length === 0) return;
@@ -2984,6 +3003,15 @@ function MediaTab({
           </div>
         </div>
 
+        <InstagramImporter
+          vehicleId={vehicleId}
+          disabled={loading}
+          onImported={handleInstagramImported}
+          onConnectionRequired={() => {
+            toast.error("Conecte o Instagram em Configurações > Contas antes de importar.");
+          }}
+        />
+
         <div>
 
           {mixedImages.length === 0 ? (
@@ -3068,7 +3096,7 @@ function MediaTab({
             <div className="space-y-1">
               <h4 className="text-sm font-bold">Gerenciamento de Imagens</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                As imagens selecionadas localmente podem ser reordenadas antes do envio. Clique em "Realizar Upload" para salvar permanentemente.
+                As imagens selecionadas localmente podem ser reordenadas antes do envio. Clique em &quot;Realizar Upload&quot; para salvar permanentemente.
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Dica: Arraste novas imagens para dentro da janela e adicione-as ao veículo.

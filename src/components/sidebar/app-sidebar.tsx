@@ -17,7 +17,8 @@ import {
   WalletCards,
   Layers3,
   Handshake,
-  Building2
+  Building2,
+  CircleUserRound
 } from "lucide-react";
 import { NavMain } from "./components/nav-main";
 import { NavSettings } from "./components/nav-settings";
@@ -121,6 +122,12 @@ const data = {
           url: "/configuracoes/perfis",
           icon: Settings2,
           slug: "settings:profiles:view",
+        },
+        {
+          title: "Contas",
+          url: "/configuracoes/contas",
+          icon: CircleUserRound,
+          slug: "settings:accounts:view",
         },
       ],
     },
