@@ -3007,9 +3007,6 @@ function MediaTab({
           vehicleId={vehicleId}
           disabled={loading}
           onImported={handleInstagramImported}
-          onConnectionRequired={() => {
-            toast.error("Conecte o Instagram em Configurações > Contas antes de importar.");
-          }}
         />
 
         <div>

@@ -1,26 +1,32 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createAdminClient, createClient } from "@/utils/supabase/server";
+import { downloadInstagramImage, extensionFromContentType, InstagramImageDownloadError } from "@/lib/instagram/download-instagram-image";
+import { findImagesByShortcode, getInstagramAccessTokenForUser, InstagramApiError } from "@/lib/instagram/api";
 import {
-  findAuthorizedImagesByIds,
-  getInstagramAccessTokenForUser,
-  InstagramApiError,
-} from "@/lib/instagram/api";
-import type { InstagramImportResponse, InstagramMediaImage } from "@/types/instagram";
+  extractInstagramImagesFromPublicPost,
+  InstagramPublicExtractionError,
+  parseInstagramPostUrl,
+} from "@/lib/instagram/extract-instagram-images";
+import type { InstagramImportResponse } from "@/types/instagram";
 
 const MAX_IMPORT_IMAGES = 10;
 
-function extensionFromContentType(contentType: string) {
-  if (contentType.includes("jpeg") || contentType.includes("jpg")) return "jpg";
-  if (contentType.includes("png")) return "png";
-  if (contentType.includes("webp")) return "webp";
-  if (contentType.includes("gif")) return "gif";
-  return null;
-}
+const importImageSchema = z.object({
+  url: z.string().url(),
+  index: z.number().int().min(0).max(100),
+});
 
-function isValidImportImage(value: unknown): value is InstagramMediaImage {
-  if (!value || typeof value !== "object") return false;
-  const image = value as Partial<InstagramMediaImage>;
-  return typeof image.id === "string" && image.id.trim().length > 0;
+const importSchema = z.object({
+  postUrl: z.string().trim().min(1),
+  images: z.array(importImageSchema).min(1).max(MAX_IMPORT_IMAGES),
+  vehicleId: z.union([z.string(), z.number()]).optional(),
+});
+
+function normalizeVehicleId(value: string | number | undefined) {
+  if (value === undefined || value === "") return null;
+  const vehicleId = Number(value);
+  return Number.isInteger(vehicleId) && vehicleId > 0 ? vehicleId : null;
 }
 
 export async function POST(request: Request) {
@@ -32,105 +38,96 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Faça login para importar imagens." }, { status: 401 });
-    }
-
-    const body = (await request.json().catch(() => null)) as {
-      images?: unknown;
-      vehicleId?: unknown;
-    } | null;
-    const requestedImages = Array.isArray(body?.images) ? body.images.filter(isValidImportImage) : [];
-    const vehicleId =
-      typeof body?.vehicleId === "string" || typeof body?.vehicleId === "number"
-        ? Number(body.vehicleId)
-        : null;
-
-    if (requestedImages.length === 0) {
-      return NextResponse.json({ error: "Selecione pelo menos uma imagem para importar." }, { status: 400 });
-    }
-
-    if (requestedImages.length > MAX_IMPORT_IMAGES) {
       return NextResponse.json(
-        { error: `Importe no máximo ${MAX_IMPORT_IMAGES} imagens por vez.` },
+        { success: false, message: "Faça login para importar imagens." },
+        { status: 401 },
+      );
+    }
+
+    const parsedBody = importSchema.safeParse(await request.json().catch(() => null));
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { success: false, message: "Dados inválidos para importar imagens." },
         { status: 400 },
       );
     }
 
-    if (vehicleId !== null && (!Number.isInteger(vehicleId) || vehicleId <= 0)) {
-      return NextResponse.json({ error: "Veículo inválido para vincular as imagens." }, { status: 400 });
-    }
-
-    const accessToken = await getInstagramAccessTokenForUser(user.id);
-    if (!accessToken) {
+    const { shortcode } = parseInstagramPostUrl(parsedBody.data.postUrl);
+    const vehicleId = normalizeVehicleId(parsedBody.data.vehicleId);
+    if (parsedBody.data.vehicleId !== undefined && !vehicleId) {
       return NextResponse.json(
-        {
-          code: "INSTAGRAM_NOT_CONNECTED",
-          error: "Conta Instagram não conectada. Conecte uma conta autorizada antes de importar.",
-        },
-        { status: 409 },
+        { success: false, message: "Veículo inválido para vincular as imagens." },
+        { status: 400 },
       );
     }
 
-    const authorizedImages = await findAuthorizedImagesByIds(
-      requestedImages.map((image) => image.id),
-      accessToken,
+    const uniqueRequestedImages = Array.from(
+      new Map(parsedBody.data.images.map((image) => [`${image.index}:${image.url}`, image])).values(),
     );
-    const authorizedIds = new Set(authorizedImages.map((image) => image.id));
 
-    if (authorizedImages.length !== requestedImages.length) {
+    if (uniqueRequestedImages.length === 0) {
       return NextResponse.json(
-        { error: "Uma ou mais imagens selecionadas não pertencem à conta Instagram conectada." },
+        { success: false, message: "Selecione pelo menos uma imagem para importar." },
+        { status: 400 },
+      );
+    }
+
+    let allowedImages: Map<string, unknown>;
+    const accessToken = await getInstagramAccessTokenForUser(user.id).catch((error) => {
+      if (error instanceof InstagramApiError && error.status === 409) return null;
+      throw error;
+    });
+
+    if (accessToken) {
+      const authorizedImages = await findImagesByShortcode(shortcode, accessToken);
+      allowedImages = new Map(
+        authorizedImages.map((image, index) => [`${index}:${image.media_url || image.url}`, image]),
+      );
+    } else {
+      const extracted = await extractInstagramImagesFromPublicPost(parsedBody.data.postUrl);
+      allowedImages = new Map(
+        extracted.images.map((image) => [`${image.index}:${image.url}`, image]),
+      );
+    }
+
+    const invalidImage = uniqueRequestedImages.find((image) => !allowedImages.has(`${image.index}:${image.url}`));
+    if (invalidImage) {
+      return NextResponse.json(
+        { success: false, message: "Uma ou mais imagens não foram confirmadas no post público informado." },
         { status: 403 },
       );
     }
 
     const { supabase: adminSupabase, error: adminError } = await createAdminClient();
     if (adminError || !adminSupabase) {
-      return NextResponse.json({ error: "Configuração Supabase de backend ausente." }, { status: 500 });
+      return NextResponse.json(
+        { success: false, message: "Configuração Supabase de backend ausente." },
+        { status: 500 },
+      );
     }
 
-    const bucket = process.env.SUPABASE_STORAGE_BUCKET || "vehicles";
-    const imported: InstagramImportResponse["imported"] = [];
+    const bucket = process.env.SUPABASE_BUCKET_IMPORTS || process.env.SUPABASE_STORAGE_BUCKET || "vehicles";
+    const files: NonNullable<InstagramImportResponse["files"]> = [];
 
-    for (const image of authorizedImages) {
-      if (!authorizedIds.has(image.id)) continue;
-
-      const imageResponse = await fetch(image.media_url, { cache: "no-store" });
-      if (!imageResponse.ok) {
-        return NextResponse.json(
-          { error: `Erro ao baixar imagem ${image.id} do Instagram.` },
-          { status: 502 },
-        );
-      }
-
-      const contentType = imageResponse.headers.get("content-type");
-      if (!contentType) {
-        return NextResponse.json(
-          { error: `Imagem ${image.id} sem content-type válido.` },
-          { status: 422 },
-        );
-      }
-
+    for (const requestedImage of uniqueRequestedImages) {
+      const { bytes, contentType } = await downloadInstagramImage(requestedImage.url);
       const extension = extensionFromContentType(contentType);
-      if (!extension || !contentType.startsWith("image/")) {
+      if (!extension) {
         return NextResponse.json(
-          { error: `Imagem ${image.id} possui formato não suportado.` },
+          { success: false, message: "Formato de imagem não suportado." },
           { status: 422 },
         );
       }
 
-      const bytes = await imageResponse.arrayBuffer();
-      const timestamp = Date.now();
-      const path = `instagram/${user.id}/${image.id}-${timestamp}.${extension}`;
+      const path = `instagram/${shortcode}/${Date.now()}-${requestedImage.index}.${extension}`;
       const { error: uploadError } = await adminSupabase.storage.from(bucket).upload(path, bytes, {
         contentType,
         upsert: false,
       });
 
       if (uploadError) {
-        console.error("Error uploading Instagram image:", uploadError);
         return NextResponse.json(
-          { error: `Erro ao salvar imagem ${image.id} no Supabase Storage.` },
+          { success: false, message: "Erro ao salvar imagem no Supabase Storage." },
           { status: 500 },
         );
       }
@@ -146,18 +143,20 @@ export async function POST(request: Request) {
           .insert({
             vehicle_id: vehicleId,
             image_url: publicUrl,
-            sort_order: 0,
+            sort_order: requestedImage.index,
             active: true,
             file_size: bytes.byteLength,
-            mime_type: contentType.slice(0, 50),
+            mime_type: contentType,
           })
           .select()
           .single();
 
         if (error) {
-          console.error("Error saving imported image in vehicle_images:", error);
           return NextResponse.json(
-            { error: `Imagem salva no Storage, mas não foi possível vinculá-la ao veículo.` },
+            {
+              success: false,
+              message: "Imagem salva no Storage, mas não foi possível vinculá-la ao veículo.",
+            },
             { status: 500 },
           );
         }
@@ -165,26 +164,36 @@ export async function POST(request: Request) {
         vehicleImage = data;
       }
 
-      // TODO: se houver uma tabela genérica de anexos/mídia no futuro,
-      // salvar também a referência da imagem importada aqui.
-      imported.push({
-        originalId: image.id,
-        path,
-        publicUrl,
-        vehicleImage,
-      });
+      files.push({ path, publicUrl, vehicleImage });
     }
 
-    return NextResponse.json({ success: true, imported });
+    return NextResponse.json({
+      success: true,
+      files,
+      imported: files.map((file, index) => ({
+        originalId: `img_${uniqueRequestedImages[index].index + 1}`,
+        path: file.path,
+        publicUrl: file.publicUrl,
+        vehicleImage: file.vehicleImage,
+      })),
+    });
   } catch (error) {
-    console.error("Unexpected error in /api/instagram/import:", error);
+    if (error instanceof InstagramPublicExtractionError || error instanceof InstagramImageDownloadError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: error.status },
+      );
+    }
 
     if (error instanceof InstagramApiError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: error.status },
+      );
     }
 
     return NextResponse.json(
-      { error: "Não foi possível importar as imagens do Instagram." },
+      { success: false, message: "Não foi possível importar as imagens selecionadas." },
       { status: 500 },
     );
   }

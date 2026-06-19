@@ -1,35 +1,30 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Image as ImageIcon, Instagram, Loader2, Search, Settings } from "lucide-react";
+import { Check, Image as ImageIcon, Instagram, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type {
-  InstagramImportResponse,
+  InstagramExtractResponse,
+  InstagramExtractedImage,
+  InstagramImportedFile,
   InstagramImportedImage,
-  InstagramMediaImage,
-  InstagramMediaResponse,
+  InstagramImportResponse,
 } from "@/types/instagram";
 
 interface InstagramImporterProps {
   vehicleId?: string | number;
   disabled?: boolean;
   onImported?: (imported: InstagramImportedImage[]) => void;
-  onConnectionRequired?: () => void;
 }
 
-export function InstagramImporter({
-  vehicleId,
-  disabled,
-  onImported,
-  onConnectionRequired,
-}: InstagramImporterProps) {
+export function InstagramImporter({ vehicleId, disabled, onImported }: InstagramImporterProps) {
   const [postUrl, setPostUrl] = useState("");
-  const [images, setImages] = useState<InstagramMediaImage[]>([]);
+  const [images, setImages] = useState<InstagramExtractedImage[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [connectionRequired, setConnectionRequired] = useState(false);
+  const [savedFiles, setSavedFiles] = useState<InstagramImportedFile[]>([]);
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState(false);
 
@@ -47,25 +42,21 @@ export function InstagramImporter({
     setSearching(true);
     setImages([]);
     setSelectedIds(new Set());
-    setConnectionRequired(false);
+    setSavedFiles([]);
 
     try {
-      const response = await fetch("/api/instagram/media", {
+      const response = await fetch("/api/instagram/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postUrl }),
+        body: JSON.stringify({ url: postUrl }),
       });
-      const data = (await response.json().catch(() => ({}))) as Partial<InstagramMediaResponse> & {
-        code?: string;
+      const data = (await response.json().catch(() => ({}))) as Partial<InstagramExtractResponse> & {
         error?: string;
+        message?: string;
       };
 
-      if (!response.ok) {
-        if (data.code === "INSTAGRAM_NOT_CONNECTED") {
-          setConnectionRequired(true);
-          onConnectionRequired?.();
-        }
-        throw new Error(data.error || "Não foi possível buscar imagens do Instagram.");
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || data.error || "Não foi possível buscar imagens do Instagram.");
       }
 
       const nextImages = data.images || [];
@@ -97,25 +88,26 @@ export function InstagramImporter({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          images: selectedImages,
+          postUrl,
+          images: selectedImages.map((image) => ({
+            url: image.url,
+            index: image.index,
+          })),
           vehicleId,
         }),
       });
       const data = (await response.json().catch(() => ({}))) as Partial<InstagramImportResponse> & {
-        code?: string;
         error?: string;
+        message?: string;
       };
 
       if (!response.ok || !data.success) {
-        if (data.code === "INSTAGRAM_NOT_CONNECTED") {
-          setConnectionRequired(true);
-          onConnectionRequired?.();
-        }
-        throw new Error(data.error || "Não foi possível importar as imagens.");
+        throw new Error(data.message || data.error || "Não foi possível importar as imagens.");
       }
 
       toast.success("Imagens importadas com sucesso.");
       onImported?.(data.imported || []);
+      setSavedFiles(data.files || []);
       setSelectedIds(new Set());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao importar imagens.");
@@ -165,47 +157,39 @@ export function InstagramImporter({
         </Button>
       </div>
 
-      {connectionRequired && (
-        <div className="flex flex-col gap-3 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-sm md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="font-semibold text-amber-900 dark:text-amber-100">
-              Instagram não conectado
-            </p>
-            <p className="text-muted-foreground">
-              Conecte a conta em Configurações &gt; Contas para buscar as imagens pela API autorizada.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => {
-              window.location.href = "/configuracoes/contas";
-            }}
-          >
-            <Settings className="h-4 w-4" />
-            Abrir Contas
-          </Button>
-        </div>
-      )}
+      <p className="text-xs text-muted-foreground">
+        A captura usa apenas metadados públicos da postagem. Se o Instagram limitar o acesso público, a busca pode falhar.
+      </p>
 
       {images.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <p className="text-xs text-muted-foreground">
               {selectedImages.length} de {images.length} selecionada(s)
             </p>
-            <Button
-              type="button"
-              size="sm"
-              className="gap-2"
-              onClick={handleImport}
-              disabled={busy || selectedImages.length === 0}
-            >
-              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-              Prosseguir e importar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => setSelectedIds(new Set())}
+                disabled={busy || selectedImages.length === 0}
+              >
+                <X className="h-4 w-4" />
+                Limpar seleção
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-2"
+                onClick={handleImport}
+                disabled={busy || selectedImages.length === 0}
+              >
+                {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                Importar selecionadas
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -228,7 +212,7 @@ export function InstagramImporter({
                 >
                   <span
                     className="block h-full w-full bg-cover bg-center"
-                    style={{ backgroundImage: `url("${image.media_url}")` }}
+                    style={{ backgroundImage: `url("${image.url}")` }}
                   />
                   <span
                     className={cn(
@@ -241,6 +225,27 @@ export function InstagramImporter({
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {savedFiles.length > 0 && (
+        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm">
+          <p className="font-semibold text-emerald-900 dark:text-emerald-100">
+            {savedFiles.length} imagem(ns) salva(s)
+          </p>
+          <div className="mt-2 space-y-1">
+            {savedFiles.map((file) => (
+              <a
+                key={file.path}
+                href={file.publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block truncate text-xs text-muted-foreground hover:text-foreground"
+              >
+                {file.path}
+              </a>
+            ))}
           </div>
         </div>
       )}

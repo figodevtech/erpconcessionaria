@@ -59,6 +59,17 @@ export function getInstagramOAuthConfig(origin?: string) {
     };
   }
 
+  if (!redirectUri.includes("/api/instagram/oauth/callback")) {
+    return {
+      error:
+        "INSTAGRAM_REDIRECT_URI deve apontar para /api/instagram/oauth/callback.",
+      clientId,
+      clientSecret,
+      redirectUri,
+      scope,
+    };
+  }
+
   if (!/^\d+$/.test(clientId)) {
     return {
       error:

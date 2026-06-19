@@ -111,13 +111,15 @@ async function listCarouselChildren(mediaId: string, accessToken: string) {
   return data.data || [];
 }
 
-function toImage(media: InstagramGraphMedia): InstagramMediaImage | null {
-  if (media.media_type !== "IMAGE" || !media.media_url) return null;
+function toImage(media: InstagramGraphMedia, fallbackPermalink?: string): InstagramMediaImage | null {
+  const imageUrl = media.media_type === "IMAGE" ? media.media_url : media.thumbnail_url;
+  if (!imageUrl) return null;
 
   return {
     id: media.id,
-    media_url: media.media_url,
-    permalink: media.permalink,
+    media_url: imageUrl,
+    url: imageUrl,
+    permalink: media.permalink || fallbackPermalink,
     thumbnail_url: media.thumbnail_url,
   };
 }
@@ -135,11 +137,18 @@ export async function findImagesByShortcode(shortcode: string, accessToken: stri
 
   if (media.media_type === "CAROUSEL_ALBUM") {
     const children = await listCarouselChildren(media.id, accessToken);
-    return children.map(toImage).filter((image): image is InstagramMediaImage => Boolean(image));
+    return children
+      .map((child) => toImage(child, media.permalink))
+      .filter((image): image is InstagramMediaImage => Boolean(image))
+      .map((image, index) => ({
+        ...image,
+        id: image.id,
+        index,
+      }));
   }
 
   const image = toImage(media);
-  return image ? [image] : [];
+  return image ? [{ ...image, index: 0 }] : [];
 }
 
 export async function findAuthorizedImagesByIds(ids: string[], accessToken: string) {
@@ -156,7 +165,7 @@ export async function findAuthorizedImagesByIds(ids: string[], accessToken: stri
     if (media.media_type === "CAROUSEL_ALBUM") {
       const children = await listCarouselChildren(media.id, accessToken);
       for (const child of children) {
-        const childImage = toImage(child);
+        const childImage = toImage(child, media.permalink);
         if (childImage) images.set(childImage.id, childImage);
       }
     }
