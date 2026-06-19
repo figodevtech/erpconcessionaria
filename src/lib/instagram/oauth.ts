@@ -37,7 +37,9 @@ interface InstagramLongLivedTokenResponse {
 
 interface InstagramProfileResponse {
   id?: string;
+  user_id?: string;
   username?: string;
+  name?: string;
   account_type?: string;
   media_count?: number;
   error?: {
@@ -50,6 +52,10 @@ interface InstagramOAuthStatePayload {
   returnTo: string;
   exp: number;
   nonce: string;
+}
+
+function getInstagramGraphApiVersion() {
+  return process.env.INSTAGRAM_GRAPH_API_VERSION || "v25.0";
 }
 
 function base64UrlEncode(value: string) {
@@ -242,18 +248,22 @@ async function tryExchangeForLongLivedToken(shortLivedToken: string, origin: str
 }
 
 async function fetchInstagramProfile(accessToken: string) {
-  const url = new URL("https://graph.instagram.com/me");
-  url.searchParams.set("fields", "id,username,account_type,media_count");
+  const url = new URL(`https://graph.instagram.com/${getInstagramGraphApiVersion()}/me`);
+  url.searchParams.set("fields", "user_id,username,name,account_type,media_count");
   url.searchParams.set("access_token", accessToken);
 
   const response = await fetch(url, { cache: "no-store" });
   const data = (await response.json().catch(() => ({}))) as InstagramProfileResponse;
+  const instagramUserId = data.user_id || data.id;
 
-  if (!response.ok || !data.id) {
+  if (!response.ok || !instagramUserId) {
     throw new Error(data.error?.message || "Não foi possível ler o perfil Instagram conectado.");
   }
 
-  return data;
+  return {
+    ...data,
+    id: instagramUserId,
+  };
 }
 
 export async function connectInstagramAccount(userId: string, code: string, origin: string) {

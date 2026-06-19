@@ -55,6 +55,10 @@ const CHILD_FIELDS = "id,media_type,media_url,permalink,thumbnail_url";
 const MAX_PAGES_TO_SCAN = 10;
 const TOKEN_REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 
+function getInstagramGraphApiVersion() {
+  return process.env.INSTAGRAM_GRAPH_API_VERSION || "v25.0";
+}
+
 async function refreshLongLivedToken(accessToken: string) {
   const url = new URL("https://graph.instagram.com/refresh_access_token");
   url.searchParams.set("grant_type", "ig_refresh_token");
@@ -152,7 +156,7 @@ async function fetchInstagramJson(url: string): Promise<InstagramGraphListRespon
 
 export async function listAuthorizedMedia(accessToken: string, maxPages = MAX_PAGES_TO_SCAN) {
   const media: InstagramGraphMedia[] = [];
-  const initialUrl = new URL("https://graph.instagram.com/me/media");
+  const initialUrl = new URL(`https://graph.instagram.com/${getInstagramGraphApiVersion()}/me/media`);
   initialUrl.searchParams.set("fields", MEDIA_FIELDS);
   initialUrl.searchParams.set("limit", "25");
   initialUrl.searchParams.set("access_token", accessToken);
@@ -235,7 +239,7 @@ export async function findVideoByShortcode(shortcode: string, accessToken: strin
 }
 
 async function listCarouselChildren(mediaId: string, accessToken: string) {
-  const childrenUrl = new URL(`https://graph.instagram.com/${mediaId}/children`);
+  const childrenUrl = new URL(`https://graph.instagram.com/${getInstagramGraphApiVersion()}/${mediaId}/children`);
   childrenUrl.searchParams.set("fields", CHILD_FIELDS);
   childrenUrl.searchParams.set("access_token", accessToken);
 
