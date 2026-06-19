@@ -22,12 +22,29 @@ const importSchema = z.object({
   postUrl: z.string().trim().min(1),
   images: z.array(importImageSchema).min(1).max(MAX_IMPORT_IMAGES),
   vehicleId: z.union([z.string(), z.number()]).optional(),
+  startSortOrder: z.number().int().min(0).optional(),
 });
 
 function normalizeVehicleId(value: string | number | undefined) {
   if (value === undefined || value === "") return null;
   const vehicleId = Number(value);
   return Number.isInteger(vehicleId) && vehicleId > 0 ? vehicleId : null;
+}
+
+async function getNextVehicleImageSortOrder(
+  adminSupabase: NonNullable<Awaited<ReturnType<typeof createAdminClient>>["supabase"]>,
+  vehicleId: number,
+) {
+  const { data, error } = await adminSupabase
+    .from("vehicle_images")
+    .select("sort_order")
+    .eq("vehicle_id", vehicleId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return typeof data?.sort_order === "number" ? data.sort_order + 1 : 0;
 }
 
 export async function POST(request: Request) {
@@ -131,8 +148,11 @@ export async function POST(request: Request) {
 
     const bucket = process.env.SUPABASE_BUCKET_IMPORTS || process.env.SUPABASE_STORAGE_BUCKET || "vehicles";
     const files: NonNullable<InstagramImportResponse["files"]> = [];
+    const baseSortOrder = vehicleId
+      ? parsedBody.data.startSortOrder ?? await getNextVehicleImageSortOrder(adminSupabase, vehicleId)
+      : 0;
 
-    for (const requestedImage of resolvedImages) {
+    for (const [importIndex, requestedImage] of resolvedImages.entries()) {
       if (!requestedImage?.url) continue;
 
       const { bytes, contentType } = await downloadInstagramImage(requestedImage.url);
@@ -168,7 +188,7 @@ export async function POST(request: Request) {
           .insert({
             vehicle_id: vehicleId,
             image_url: publicUrl,
-            sort_order: requestedImage.index,
+            sort_order: baseSortOrder + importIndex,
             active: true,
             file_size: bytes.byteLength,
             mime_type: contentType,

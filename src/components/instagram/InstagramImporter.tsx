@@ -17,10 +17,11 @@ import type {
 interface InstagramImporterProps {
   vehicleId?: string | number;
   disabled?: boolean;
+  startSortOrder?: number;
   onImported?: (imported: InstagramImportedImage[]) => void;
 }
 
-export function InstagramImporter({ vehicleId, disabled, onImported }: InstagramImporterProps) {
+export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImported }: InstagramImporterProps) {
   const [postUrl, setPostUrl] = useState("");
   const [images, setImages] = useState<InstagramExtractedImage[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -95,6 +96,7 @@ export function InstagramImporter({ vehicleId, disabled, onImported }: Instagram
             index: image.index,
           })),
           vehicleId,
+          startSortOrder,
         }),
       });
       const data = (await response.json().catch(() => ({}))) as Partial<InstagramImportResponse> & {
@@ -109,6 +111,7 @@ export function InstagramImporter({ vehicleId, disabled, onImported }: Instagram
       toast.success("Imagens importadas com sucesso.");
       onImported?.(data.imported || []);
       setSavedFiles(data.files || []);
+      setImages([]);
       setSelectedIds(new Set());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao importar imagens.");

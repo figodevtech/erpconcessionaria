@@ -3006,6 +3006,7 @@ function MediaTab({
         <InstagramImporter
           vehicleId={vehicleId}
           disabled={loading}
+          startSortOrder={mixedImages.length}
           onImported={handleInstagramImported}
         />
 
