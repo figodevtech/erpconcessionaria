@@ -17,6 +17,8 @@ interface InstagramShortLivedTokenResponse {
   access_token?: string;
   user_id?: number;
   permissions?: string;
+  token_type?: string;
+  expires_in?: number;
   error_message?: string;
   error_type?: string;
   code?: number;
@@ -28,6 +30,8 @@ interface InstagramLongLivedTokenResponse {
   expires_in?: number;
   error?: {
     message?: string;
+    type?: string;
+    code?: number;
   };
 }
 
@@ -228,6 +232,15 @@ async function exchangeForLongLivedToken(shortLivedToken: string, origin: string
   return data;
 }
 
+async function tryExchangeForLongLivedToken(shortLivedToken: string, origin: string) {
+  try {
+    return await exchangeForLongLivedToken(shortLivedToken, origin);
+  } catch (error) {
+    console.warn("Instagram long-lived token exchange failed. Falling back to short-lived token.", error);
+    return null;
+  }
+}
+
 async function fetchInstagramProfile(accessToken: string) {
   const url = new URL("https://graph.instagram.com/me");
   url.searchParams.set("fields", "id,username,account_type,media_count");
@@ -245,8 +258,16 @@ async function fetchInstagramProfile(accessToken: string) {
 
 export async function connectInstagramAccount(userId: string, code: string, origin: string) {
   const shortLived = await exchangeCodeForShortLivedToken(code, origin);
-  const longLived = await exchangeForLongLivedToken(shortLived.access_token!, origin);
-  const profile = await fetchInstagramProfile(longLived.access_token!);
+  const longLived = await tryExchangeForLongLivedToken(shortLived.access_token!, origin);
+  const token = longLived?.access_token || shortLived.access_token!;
+  const tokenType = longLived?.token_type || shortLived.token_type || "short_lived";
+  const expiresIn =
+    typeof longLived?.expires_in === "number"
+      ? longLived.expires_in
+      : typeof shortLived.expires_in === "number"
+        ? shortLived.expires_in
+        : 60 * 60;
+  const profile = await fetchInstagramProfile(token);
   const config = getInstagramOAuthConfig(origin);
 
   const { supabase, error } = await createAdminClient();
@@ -255,8 +276,8 @@ export async function connectInstagramAccount(userId: string, code: string, orig
   }
 
   const expiresAt =
-    typeof longLived.expires_in === "number"
-      ? new Date(Date.now() + longLived.expires_in * 1000).toISOString()
+    typeof expiresIn === "number"
+      ? new Date(Date.now() + expiresIn * 1000).toISOString()
       : null;
 
   const { error: upsertError } = await supabase.from("instagram_accounts").upsert(
@@ -266,8 +287,8 @@ export async function connectInstagramAccount(userId: string, code: string, orig
       username: profile.username || null,
       account_type: profile.account_type || null,
       media_count: profile.media_count ?? null,
-      access_token: longLived.access_token,
-      token_type: longLived.token_type || null,
+      access_token: token,
+      token_type: tokenType,
       scope: config.scope,
       expires_at: expiresAt,
       connected_at: new Date().toISOString(),
