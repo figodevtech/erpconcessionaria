@@ -1,15 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Image as ImageIcon, Instagram, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type {
   InstagramExtractResponse,
   InstagramExtractedImage,
-  InstagramImportedFile,
   InstagramImportedImage,
   InstagramImportResponse,
 } from "@/types/instagram";
@@ -21,21 +28,70 @@ interface InstagramImporterProps {
   onImported?: (imported: InstagramImportedImage[]) => void;
 }
 
+interface InstagramPostOption {
+  id: string;
+  media_type?: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  permalink: string;
+  caption?: string;
+  timestamp?: string;
+}
+
 export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImported }: InstagramImporterProps) {
   const [postUrl, setPostUrl] = useState("");
   const [images, setImages] = useState<InstagramExtractedImage[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [savedFiles, setSavedFiles] = useState<InstagramImportedFile[]>([]);
+  const [postDialogOpen, setPostDialogOpen] = useState(false);
+  const [posts, setPosts] = useState<InstagramPostOption[]>([]);
+  const [connectionLabel, setConnectionLabel] = useState("Verificando...");
+  const [connected, setConnected] = useState(false);
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
   const selectedImages = useMemo(
     () => images.filter((image) => selectedIds.has(image.id)),
     [images, selectedIds],
   );
 
-  async function handleSearch() {
-    if (!postUrl.trim()) {
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadConnectionStatus() {
+      try {
+        const response = await fetch("/api/instagram/status", { cache: "no-store" });
+        const data = (await response.json().catch(() => ({}))) as {
+          connected?: boolean;
+          account?: { username?: string | null };
+        };
+
+        if (ignore) return;
+
+        if (response.ok && data.connected) {
+          setConnected(true);
+          setConnectionLabel(data.account?.username ? `@${data.account.username}` : "Conectado");
+        } else {
+          setConnected(false);
+          setConnectionLabel("Não conectado");
+        }
+      } catch {
+        if (!ignore) {
+          setConnected(false);
+          setConnectionLabel("Indisponível");
+        }
+      }
+    }
+
+    loadConnectionStatus();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  async function searchImages(urlToSearch = postUrl) {
+    if (!urlToSearch.trim()) {
       toast.error("Cole o link da postagem do Instagram.");
       return;
     }
@@ -43,13 +99,12 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
     setSearching(true);
     setImages([]);
     setSelectedIds(new Set());
-    setSavedFiles([]);
 
     try {
       const response = await fetch("/api/instagram/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: postUrl }),
+        body: JSON.stringify({ url: urlToSearch }),
       });
       const data = (await response.json().catch(() => ({}))) as Partial<InstagramExtractResponse> & {
         error?: string;
@@ -74,6 +129,44 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
     } finally {
       setSearching(false);
     }
+  }
+
+  async function handleSearch() {
+    await searchImages(postUrl);
+  }
+
+  async function loadPosts() {
+    setPostDialogOpen(true);
+
+    setLoadingPosts(true);
+    try {
+      const response = await fetch("/api/instagram/posts", { cache: "no-store" });
+      const data = (await response.json().catch(() => ({}))) as {
+        posts?: InstagramPostOption[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error || "Não foi possível listar as postagens.");
+      }
+
+      setPosts(data.posts || []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao listar postagens.");
+    } finally {
+      setLoadingPosts(false);
+    }
+  }
+
+  async function handleSelectPost(post: InstagramPostOption) {
+    if (!post.permalink) {
+      toast.error("Postagem sem link válido.");
+      return;
+    }
+
+    setPostDialogOpen(false);
+    setPostUrl(post.permalink);
+    await searchImages(post.permalink);
   }
 
   async function handleImport() {
@@ -110,7 +203,6 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
 
       toast.success("Imagens importadas com sucesso.");
       onImported?.(data.imported || []);
-      setSavedFiles(data.files || []);
       setImages([]);
       setSelectedIds(new Set());
     } catch (error) {
@@ -132,6 +224,11 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
     });
   }
 
+  function cancelImportSelection() {
+    setImages([]);
+    setSelectedIds(new Set());
+  }
+
   const busy = searching || importing || disabled;
 
   return (
@@ -141,6 +238,9 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
           <div className="flex items-center gap-2 text-sm font-bold">
             <Instagram className="h-4 w-4 text-primary" />
             Importar do Instagram
+            <Badge variant={connected ? "default" : "outline"} className="ml-1">
+              {connectionLabel}
+            </Badge>
           </div>
           <Input
             value={postUrl}
@@ -149,16 +249,28 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
             disabled={busy}
           />
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2"
-          onClick={handleSearch}
-          disabled={busy}
-        >
-          {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          Buscar imagens
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={loadPosts}
+            disabled={busy || !connected}
+          >
+            {loadingPosts ? <Loader2 className="h-4 w-4 animate-spin" /> : <Instagram className="h-4 w-4" />}
+            Selecionar postagem
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={handleSearch}
+            disabled={busy}
+          >
+            {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            Buscar imagens
+          </Button>
+        </div>
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -182,6 +294,17 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
               >
                 <X className="h-4 w-4" />
                 Limpar seleção
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={cancelImportSelection}
+                disabled={busy}
+              >
+                <X className="h-4 w-4" />
+                Cancelar importação
               </Button>
               <Button
                 type="button"
@@ -233,26 +356,57 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
         </div>
       )}
 
-      {savedFiles.length > 0 && (
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm">
-          <p className="font-semibold text-emerald-900 dark:text-emerald-100">
-            {savedFiles.length} imagem(ns) salva(s)
-          </p>
-          <div className="mt-2 space-y-1">
-            {savedFiles.map((file) => (
-              <a
-                key={file.path}
-                href={file.publicUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="block truncate text-xs text-muted-foreground hover:text-foreground"
-              >
-                {file.path}
-              </a>
-            ))}
+      <Dialog open={postDialogOpen} onOpenChange={setPostDialogOpen}>
+        <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Selecionar postagem</DialogTitle>
+            <DialogDescription>
+              Escolha uma publicação da conta conectada para carregar as imagens.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="min-h-[300px] overflow-y-auto pr-1">
+            {loadingPosts ? (
+              <div className="flex h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando postagens...
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                Nenhuma postagem encontrada.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                {posts.map((post) => {
+                  const previewUrl = post.media_url || post.thumbnail_url;
+
+                  return (
+                    <button
+                      type="button"
+                      key={post.id}
+                      className="group overflow-hidden rounded-lg border bg-muted text-left transition hover:border-primary"
+                      onClick={() => handleSelectPost(post)}
+                    >
+                      <div
+                        className="aspect-square bg-cover bg-center"
+                        style={previewUrl ? { backgroundImage: `url("${previewUrl}")` } : undefined}
+                      />
+                      <div className="space-y-1 p-2">
+                        <p className="truncate text-xs font-medium">
+                          {post.media_type || "Postagem"}
+                        </p>
+                        <p className="line-clamp-2 text-xs text-muted-foreground">
+                          {post.caption || post.permalink}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

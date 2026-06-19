@@ -9,6 +9,8 @@ interface InstagramGraphMedia {
   media_url?: string;
   permalink?: string;
   thumbnail_url?: string;
+  caption?: string;
+  timestamp?: string;
 }
 
 interface InstagramGraphListResponse {
@@ -83,16 +85,17 @@ async function fetchInstagramJson(url: string): Promise<InstagramGraphListRespon
   return data;
 }
 
-async function listAuthorizedMedia(accessToken: string) {
+export async function listAuthorizedMedia(accessToken: string, maxPages = MAX_PAGES_TO_SCAN) {
   const media: InstagramGraphMedia[] = [];
   const initialUrl = new URL("https://graph.instagram.com/me/media");
   initialUrl.searchParams.set("fields", MEDIA_FIELDS);
+  initialUrl.searchParams.set("limit", "25");
   initialUrl.searchParams.set("access_token", accessToken);
 
   let nextUrl: string | undefined = initialUrl.toString();
   let scannedPages = 0;
 
-  while (nextUrl && scannedPages < MAX_PAGES_TO_SCAN) {
+  while (nextUrl && scannedPages < maxPages) {
     const data = await fetchInstagramJson(nextUrl);
     media.push(...(data.data || []));
     nextUrl = data.paging?.next;
@@ -100,6 +103,70 @@ async function listAuthorizedMedia(accessToken: string) {
   }
 
   return media;
+}
+
+export async function listAuthorizedPosts(accessToken: string, limit = 24) {
+  const mediaList = await listAuthorizedMedia(accessToken, 3);
+
+  return mediaList
+    .filter((media) => {
+      if (!media.permalink) return false;
+      if (media.permalink.includes("/reel/")) return false;
+      return media.media_type === "IMAGE" || media.media_type === "CAROUSEL_ALBUM";
+    })
+    .slice(0, limit)
+    .map((media) => ({
+      id: media.id,
+      media_type: media.media_type,
+      media_url: media.media_url || media.thumbnail_url || "",
+      thumbnail_url: media.thumbnail_url,
+      permalink: media.permalink || "",
+      caption: media.caption,
+      timestamp: media.timestamp,
+    }));
+}
+
+export async function listAuthorizedReels(accessToken: string, limit = 24) {
+  const mediaList = await listAuthorizedMedia(accessToken, 3);
+
+  return mediaList
+    .filter((media) => {
+      if (!media.permalink) return false;
+      return media.media_type === "VIDEO" && media.permalink.includes("/reel/");
+    })
+    .slice(0, limit)
+    .map((media) => ({
+      id: media.id,
+      media_type: media.media_type,
+      media_url: media.media_url || "",
+      thumbnail_url: media.thumbnail_url,
+      permalink: media.permalink || "",
+      caption: media.caption,
+      timestamp: media.timestamp,
+    }));
+}
+
+export async function findVideoByShortcode(shortcode: string, accessToken: string) {
+  const mediaList = await listAuthorizedMedia(accessToken);
+  const media = mediaList.find(
+    (item) => item.media_type === "VIDEO" && item.permalink?.includes(shortcode),
+  );
+
+  if (!media || !media.media_url) {
+    throw new InstagramApiError(
+      "Reel não encontrado nas mídias autorizadas da conta Instagram conectada.",
+      404,
+    );
+  }
+
+  return {
+    id: media.id,
+    media_url: media.media_url,
+    thumbnail_url: media.thumbnail_url,
+    permalink: media.permalink,
+    caption: media.caption,
+    timestamp: media.timestamp,
+  };
 }
 
 async function listCarouselChildren(mediaId: string, accessToken: string) {

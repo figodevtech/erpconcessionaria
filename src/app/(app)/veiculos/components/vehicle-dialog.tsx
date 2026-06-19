@@ -81,6 +81,7 @@ import {
   ChevronDown,
   ChevronUp,
   Cog,
+  Instagram,
   Video,
   MonitorPlay,
   Smartphone,
@@ -2377,12 +2378,26 @@ function VideoCard({
   );
 }
 
+interface InstagramReelOption {
+  id: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  permalink: string;
+  caption?: string;
+  timestamp?: string;
+}
+
 function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" | "wide" }) {
   const [videoFile, setVideoFile] = useState<{ id?: string, url: string; path: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [instagramReelUrl, setInstagramReelUrl] = useState("");
+  const [importingReel, setImportingReel] = useState(false);
+  const [reelDialogOpen, setReelDialogOpen] = useState(false);
+  const [loadingReels, setLoadingReels] = useState(false);
+  const [reels, setReels] = useState<InstagramReelOption[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
   const folderPath = `${vehicleId}/videos/${type}`;
@@ -2515,6 +2530,85 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
     }
   };
 
+  const importInstagramReel = async (postUrl: string) => {
+    if (!vehicleId) {
+      toast.error("Salve o veiculo antes de importar um short.");
+      return;
+    }
+
+    const trimmedUrl = postUrl.trim();
+    if (!trimmedUrl) {
+      toast.error("Informe o link do short do Instagram.");
+      return;
+    }
+
+    const loadingToast = toast.loading("Importando shorts...");
+
+    try {
+      setImportingReel(true);
+      setReelDialogOpen(false);
+
+      const response = await fetch("/api/instagram/import-video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          postUrl: trimmedUrl,
+          vehicleId,
+          type: "shorts",
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Nao foi possivel importar o short do Instagram.");
+      }
+
+      setVideoFile({
+        id: result.video.id,
+        url: result.video.url,
+        path: result.video.path,
+      });
+      setInstagramReelUrl("");
+      toast.success("Short importado com sucesso!", { id: loadingToast });
+    } catch (error) {
+      console.error("Instagram reel import error:", error);
+      toast.error(error instanceof Error ? error.message : "Erro ao importar short do Instagram.", {
+        id: loadingToast,
+      });
+    } finally {
+      setImportingReel(false);
+    }
+  };
+
+  const loadInstagramReels = async () => {
+    if (!vehicleId) {
+      toast.error("Salve o veiculo antes de selecionar um short.");
+      return;
+    }
+
+    setReelDialogOpen(true);
+    setLoadingReels(true);
+
+    try {
+      const response = await fetch("/api/instagram/reels", { cache: "no-store" });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || "Nao foi possivel listar os shorts do Instagram.");
+      }
+
+      setReels(result.reels || []);
+    } catch (error) {
+      console.error("Instagram reels list error:", error);
+      setReels([]);
+      toast.error(error instanceof Error ? error.message : "Erro ao carregar shorts do Instagram.");
+    } finally {
+      setLoadingReels(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={cn(
@@ -2541,6 +2635,56 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
           </p>
         </div>
       </div>
+
+      {type === "shorts" && (
+        <div className="rounded-2xl border border-primary/10 bg-muted/20 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Instagram className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">Importar short do Instagram</span>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={instagramReelUrl}
+              onChange={(event) => setInstagramReelUrl(event.target.value)}
+              placeholder="https://www.instagram.com/reel/SHORTCODE/"
+              disabled={importingReel}
+              className="h-10"
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={loadInstagramReels}
+                disabled={importingReel}
+                className="h-10 whitespace-nowrap"
+              >
+                {loadingReels ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Instagram className="mr-2 h-4 w-4" />
+                )}
+                Selecionar short
+              </Button>
+              <Button
+                type="button"
+                onClick={() => importInstagramReel(instagramReelUrl)}
+                disabled={importingReel || !instagramReelUrl.trim()}
+                className="h-10 whitespace-nowrap"
+              >
+                {importingReel && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Importar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {type === "shorts" && importingReel && (
+        <div className="flex items-center gap-2 rounded-xl border border-primary/10 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Importando shorts...
+        </div>
+      )}
 
       {videoFile ? (
         <>
@@ -2620,6 +2764,69 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
         className="hidden"
         accept="video/mp4,video/webm,video/quicktime"
       />
+
+      {type === "shorts" && (
+        <Dialog open={reelDialogOpen} onOpenChange={setReelDialogOpen}>
+          <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Selecionar short do Instagram</DialogTitle>
+              <DialogDescription>
+                Escolha um reel da conta conectada para importar como video short vertical.
+              </DialogDescription>
+            </DialogHeader>
+
+            {loadingReels ? (
+              <div className="flex h-64 items-center justify-center text-muted-foreground">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Carregando shorts...
+              </div>
+            ) : reels.length === 0 ? (
+              <div className="flex h-64 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-center text-sm text-muted-foreground">
+                <Video className="h-8 w-8" />
+                Nenhum short foi encontrado na conta conectada.
+              </div>
+            ) : (
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {reels.map((reel) => {
+                    const previewUrl = reel.thumbnail_url || reel.media_url;
+
+                    return (
+                      <button
+                        key={reel.id}
+                        type="button"
+                        onClick={() => importInstagramReel(reel.permalink)}
+                        disabled={importingReel}
+                        className="group overflow-hidden rounded-xl border bg-card text-left transition hover:border-primary disabled:pointer-events-none disabled:opacity-60"
+                      >
+                        <div className="relative aspect-9/16 bg-muted">
+                          {previewUrl ? (
+                            <div
+                              aria-label={reel.caption || "Short do Instagram"}
+                              className="h-full w-full bg-cover bg-center transition group-hover:scale-105"
+                              role="img"
+                              style={{ backgroundImage: `url(${previewUrl})` }}
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-muted-foreground">
+                              <Video className="h-8 w-8" />
+                            </div>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                            <span className="line-clamp-2 text-xs font-medium text-white">
+                              {reel.caption || reel.permalink}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
