@@ -50,6 +50,13 @@ export async function POST(request: Request) {
         };
 
         if (response.images.length > 0) return NextResponse.json(response);
+        return NextResponse.json(
+          {
+            success: false,
+            message: "A API do Instagram não retornou imagens para esta publicação.",
+          },
+          { status: 404 },
+        );
       }
     }
 

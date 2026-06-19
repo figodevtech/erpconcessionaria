@@ -13,6 +13,7 @@ import type { InstagramImportResponse } from "@/types/instagram";
 const MAX_IMPORT_IMAGES = 10;
 
 const importImageSchema = z.object({
+  id: z.string().trim().min(1).optional(),
   url: z.string().url(),
   index: z.number().int().min(0).max(100),
 });
@@ -62,7 +63,12 @@ export async function POST(request: Request) {
     }
 
     const uniqueRequestedImages = Array.from(
-      new Map(parsedBody.data.images.map((image) => [`${image.index}:${image.url}`, image])).values(),
+      new Map(
+        parsedBody.data.images.map((image) => [
+          image.id || `${image.index}:${image.url}`,
+          image,
+        ]),
+      ).values(),
     );
 
     if (uniqueRequestedImages.length === 0) {
@@ -72,7 +78,7 @@ export async function POST(request: Request) {
       );
     }
 
-    let allowedImages: Map<string, unknown>;
+    let allowedImages: Map<string, { id?: string; url: string; index: number }>;
     const accessToken = await getInstagramAccessTokenForUser(user.id).catch((error) => {
       if (error instanceof InstagramApiError && error.status === 409) return null;
       throw error;
@@ -81,16 +87,33 @@ export async function POST(request: Request) {
     if (accessToken) {
       const authorizedImages = await findImagesByShortcode(shortcode, accessToken);
       allowedImages = new Map(
-        authorizedImages.map((image, index) => [`${index}:${image.media_url || image.url}`, image]),
+        authorizedImages.map((image, index) => [
+          image.id,
+          {
+            id: image.id,
+            url: image.media_url || image.url || "",
+            index,
+          },
+        ]),
       );
     } else {
       const extracted = await extractInstagramImagesFromPublicPost(parsedBody.data.postUrl);
       allowedImages = new Map(
-        extracted.images.map((image) => [`${image.index}:${image.url}`, image]),
+        extracted.images.map((image) => [
+          `${image.index}:${image.url}`,
+          {
+            id: image.id,
+            url: image.url,
+            index: image.index,
+          },
+        ]),
       );
     }
 
-    const invalidImage = uniqueRequestedImages.find((image) => !allowedImages.has(`${image.index}:${image.url}`));
+    const resolvedImages = uniqueRequestedImages.map((image) =>
+      allowedImages.get(accessToken && image.id ? image.id : `${image.index}:${image.url}`),
+    );
+    const invalidImage = resolvedImages.some((image) => !image?.url);
     if (invalidImage) {
       return NextResponse.json(
         { success: false, message: "Uma ou mais imagens não foram confirmadas no post público informado." },
@@ -109,7 +132,9 @@ export async function POST(request: Request) {
     const bucket = process.env.SUPABASE_BUCKET_IMPORTS || process.env.SUPABASE_STORAGE_BUCKET || "vehicles";
     const files: NonNullable<InstagramImportResponse["files"]> = [];
 
-    for (const requestedImage of uniqueRequestedImages) {
+    for (const requestedImage of resolvedImages) {
+      if (!requestedImage?.url) continue;
+
       const { bytes, contentType } = await downloadInstagramImage(requestedImage.url);
       const extension = extensionFromContentType(contentType);
       if (!extension) {
@@ -171,7 +196,7 @@ export async function POST(request: Request) {
       success: true,
       files,
       imported: files.map((file, index) => ({
-        originalId: `img_${uniqueRequestedImages[index].index + 1}`,
+        originalId: resolvedImages[index]?.id || `img_${(resolvedImages[index]?.index ?? index) + 1}`,
         path: file.path,
         publicUrl: file.publicUrl,
         vehicleImage: file.vehicleImage,

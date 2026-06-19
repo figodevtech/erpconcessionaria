@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/utils/supabase/server";
+import { createHmac, timingSafeEqual, randomUUID } from "crypto";
 
 export interface InstagramAccountStatus {
   connected: boolean;
@@ -38,6 +39,79 @@ interface InstagramProfileResponse {
   error?: {
     message?: string;
   };
+}
+
+interface InstagramOAuthStatePayload {
+  userId: string;
+  returnTo: string;
+  exp: number;
+  nonce: string;
+}
+
+function base64UrlEncode(value: string) {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+function base64UrlDecode(value: string) {
+  return Buffer.from(value, "base64url").toString("utf8");
+}
+
+function getStateSecret() {
+  return (
+    process.env.INSTAGRAM_OAUTH_STATE_SECRET ||
+    process.env.INSTAGRAM_CLIENT_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
+
+function signStatePayload(payload: string) {
+  const secret = getStateSecret();
+  if (!secret) {
+    throw new Error("Configure INSTAGRAM_OAUTH_STATE_SECRET para assinar o state do OAuth.");
+  }
+
+  return createHmac("sha256", secret).update(payload).digest("base64url");
+}
+
+export function createInstagramOAuthState(userId: string, returnTo: string) {
+  const payload: InstagramOAuthStatePayload = {
+    userId,
+    returnTo,
+    exp: Date.now() + 10 * 60 * 1000,
+    nonce: randomUUID(),
+  };
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = signStatePayload(encodedPayload);
+
+  return `${encodedPayload}.${signature}`;
+}
+
+export function verifyInstagramOAuthState(state: string) {
+  const [encodedPayload, signature] = state.split(".");
+  if (!encodedPayload || !signature) return null;
+
+  const expectedSignature = signStatePayload(encodedPayload);
+  const actualBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+
+  if (
+    actualBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(actualBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+
+  const payload = JSON.parse(base64UrlDecode(encodedPayload)) as InstagramOAuthStatePayload;
+  if (!payload.userId || !payload.returnTo || payload.exp < Date.now()) return null;
+
+  try {
+    const returnUrl = new URL(payload.returnTo);
+    if (returnUrl.protocol !== "https:" && returnUrl.hostname !== "localhost") return null;
+  } catch {
+    return null;
+  }
+
+  return payload;
 }
 
 export function getInstagramOAuthConfig(origin?: string) {

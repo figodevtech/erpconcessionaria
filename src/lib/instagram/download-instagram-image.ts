@@ -2,7 +2,13 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 const ALLOWED_IMAGE_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const ALLOWED_MEDIA_HOSTS = ["cdninstagram.com", "fbcdn.net", "fbsbx.com"];
+const ALLOWED_MEDIA_HOSTS = [
+  "cdninstagram.com",
+  "fbcdn.net",
+  "fbsbx.com",
+  "xx.fbcdn.net",
+  "lookaside.fbsbx.com",
+];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 12_000;
 const MAX_REDIRECTS = 3;
@@ -16,7 +22,11 @@ export class InstagramImageDownloadError extends Error {
 
 function isAllowedMediaHost(hostname: string) {
   const host = hostname.toLowerCase();
-  return ALLOWED_MEDIA_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+  return (
+    ALLOWED_MEDIA_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`)) ||
+    (host.startsWith("instagram.") && host.endsWith(".fbcdn.net")) ||
+    (host.startsWith("scontent") && host.includes(".cdninstagram.com"))
+  );
 }
 
 function isPrivateIPv4(ip: string) {

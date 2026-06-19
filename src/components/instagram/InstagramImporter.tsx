@@ -90,6 +90,7 @@ export function InstagramImporter({ vehicleId, disabled, onImported }: Instagram
         body: JSON.stringify({
           postUrl,
           images: selectedImages.map((image) => ({
+            id: image.id,
             url: image.url,
             index: image.index,
           })),

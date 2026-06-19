@@ -1,7 +1,6 @@
-import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { buildInstagramAuthorizationUrl } from "@/lib/instagram/oauth";
+import { buildInstagramAuthorizationUrl, createInstagramOAuthState } from "@/lib/instagram/oauth";
 import { checkPermission } from "@/utils/permissions";
 
 const STATE_COOKIE = "instagram_oauth_state";
@@ -22,8 +21,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  const state = randomBytes(24).toString("hex");
   const origin = new URL(request.url).origin;
+  const state = createInstagramOAuthState(
+    user.id,
+    `${origin}/configuracoes/contas`,
+  );
   const { url, error } = buildInstagramAuthorizationUrl(state, origin);
 
   if (error || !url) {
