@@ -25,6 +25,21 @@ interface InstagramGraphListResponse {
   };
 }
 
+interface InstagramAccountTokenRow {
+  access_token: string;
+  expires_at: string | null;
+  token_type: string | null;
+}
+
+interface InstagramRefreshTokenResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  error?: {
+    message?: string;
+  };
+}
+
 export class InstagramApiError extends Error {
   constructor(
     message: string,
@@ -38,6 +53,25 @@ export class InstagramApiError extends Error {
 const MEDIA_FIELDS = "id,caption,media_type,media_url,permalink,thumbnail_url,timestamp";
 const CHILD_FIELDS = "id,media_type,media_url,permalink,thumbnail_url";
 const MAX_PAGES_TO_SCAN = 10;
+const TOKEN_REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
+
+async function refreshLongLivedToken(accessToken: string) {
+  const url = new URL("https://graph.instagram.com/refresh_access_token");
+  url.searchParams.set("grant_type", "ig_refresh_token");
+  url.searchParams.set("access_token", accessToken);
+
+  const response = await fetch(url, { cache: "no-store" });
+  const data = (await response.json().catch(() => ({}))) as InstagramRefreshTokenResponse;
+
+  if (!response.ok || !data.access_token) {
+    throw new InstagramApiError(
+      data.error?.message || "Nao foi possivel renovar a conexao com o Instagram.",
+      response.status || 400,
+    );
+  }
+
+  return data;
+}
 
 export async function getInstagramAccessTokenForUser(userId: string) {
   const { supabase, error } = await createAdminClient();
@@ -48,9 +82,9 @@ export async function getInstagramAccessTokenForUser(userId: string) {
 
   const { data, error: accountError } = await supabase
     .from("instagram_accounts")
-    .select("access_token, expires_at")
+    .select("access_token, expires_at, token_type")
     .eq("user_id", userId)
-    .maybeSingle();
+    .maybeSingle<InstagramAccountTokenRow>();
 
   if (accountError) {
     console.error("Error fetching Instagram account:", accountError);
@@ -61,6 +95,37 @@ export async function getInstagramAccessTokenForUser(userId: string) {
 
   if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
     throw new InstagramApiError("A conexão com o Instagram expirou. Conecte a conta novamente.", 409);
+  }
+
+  const expiresAtMs = data.expires_at ? new Date(data.expires_at).getTime() : null;
+
+  if (
+    expiresAtMs &&
+    expiresAtMs - Date.now() <= TOKEN_REFRESH_THRESHOLD_MS &&
+    data.token_type !== "short_lived"
+  ) {
+    const refreshed = await refreshLongLivedToken(data.access_token);
+    const refreshedExpiresAt =
+      typeof refreshed.expires_in === "number"
+        ? new Date(Date.now() + refreshed.expires_in * 1000).toISOString()
+        : data.expires_at;
+
+    const { error: updateError } = await supabase
+      .from("instagram_accounts")
+      .update({
+        access_token: refreshed.access_token,
+        token_type: refreshed.token_type || data.token_type,
+        expires_at: refreshedExpiresAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    if (updateError) {
+      console.error("Error refreshing Instagram token:", updateError);
+      throw new InstagramApiError("Nao foi possivel atualizar a conexao com o Instagram.", 500);
+    }
+
+    return refreshed.access_token as string;
   }
 
   return data.access_token as string;
