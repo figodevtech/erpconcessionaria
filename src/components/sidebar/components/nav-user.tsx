@@ -1,10 +1,18 @@
-// troque o NavUser anterior por este
-
 "use client";
 
 import { useState } from "react";
-import { BadgeCheck, Bell, ChevronsUpDown, LogOut, KeyRound, Loader2 } from "lucide-react";
+import { ChevronsUpDown, KeyRound, Loader2, LogOut } from "lucide-react";
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,104 +22,112 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
-
-import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+
+  return `${parts[0][0]}${parts.at(-1)?.[0] ?? ""}`.toUpperCase();
+}
 
 export function NavUser({ user }: { user: { nome: string; email: string } }) {
   const { isMobile } = useSidebar();
-  const router = useRouter();
   const supabase = createClient();
+  const initials = getInitials(user.nome);
 
-  // --- Modal Alterar Senha
-  const [pwdOpen, setPwdOpen] = useState(false);
-  const [currentPwd, setCurrentPwd] = useState("");
-  const [pwd, setPwd] = useState("");
-  const [pwd2, setPwd2] = useState("");
-  const [savingPwd, setSavingPwd] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      router.push("/login");
-      router.refresh();
-    } catch {
-      router.push("/login");
+    } finally {
+      window.location.assign("/login");
     }
   };
 
-  const openChangePwd = () => {
-    setCurrentPwd("");
-    setPwd("");
-    setPwd2("");
-    setPwdOpen(true);
+  const openChangePassword = () => {
+    setCurrentPassword("");
+    setPassword("");
+    setPasswordConfirmation("");
+    setPasswordDialogOpen(true);
   };
 
   const handleChangePassword = async () => {
-    if (!currentPwd.trim()) return toast.error("Informe a senha atual.");
-    if (!pwd.trim() || !pwd2.trim()) return toast.error("Preencha a nova senha e a confirmação.");
-    if (pwd !== pwd2) return toast.error("As senhas não conferem.");
-    if (pwd.length < 8) return toast.error("A nova senha deve ter pelo menos 8 caracteres.");
+    if (!currentPassword.trim()) return toast.error("Informe a senha atual.");
+    if (!password.trim() || !passwordConfirmation.trim()) {
+      return toast.error("Preencha a nova senha e a confirmação.");
+    }
+    if (password !== passwordConfirmation) {
+      return toast.error("As senhas não conferem.");
+    }
+    if (password.length < 8) {
+      return toast.error("A nova senha deve ter pelo menos 8 caracteres.");
+    }
 
-    setSavingPwd(true);
+    setSavingPassword(true);
     try {
-      // 1) sessão temporária no Supabase
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
-        password: currentPwd,
+        password: currentPassword,
       });
-      if (signInErr) {
-        const msg = (signInErr.message || "").toLowerCase();
 
-        // senha atual errada
-        if (msg.includes("invalid login")) {
+      if (signInError) {
+        const message = (signInError.message || "").toLowerCase();
+
+        if (message.includes("invalid login")) {
           toast.error("Senha atual incorreta.");
-        } else if (msg.includes("email not confirmed")) {
+        } else if (message.includes("email not confirmed")) {
           toast.error("E-mail não confirmado. Confirme seu e-mail para alterar a senha.");
         } else {
-          toast.error(signInErr.message || "Falha ao autenticar no Supabase.");
+          toast.error(signInError.message || "Falha ao autenticar no Supabase.");
         }
         return;
       }
 
-      // 2) troca a senha
-      const { error: updErr } = await supabase.auth.updateUser({ password: pwd });
-      if (updErr) {
-        const m = (updErr.message || "").toLowerCase();
-        if (m.includes("different")) {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password,
+      });
+
+      if (updateError) {
+        const message = (updateError.message || "").toLowerCase();
+
+        if (message.includes("different")) {
           toast.error("A nova senha deve ser diferente da atual.");
-        } else if (m.includes("at least") || m.includes("too short")) {
+        } else if (message.includes("at least") || message.includes("too short")) {
           toast.error("A senha não atende aos requisitos mínimos.");
         } else {
-          toast.error(updErr.message || "Não foi possível alterar a senha.");
+          toast.error(updateError.message || "Não foi possível alterar a senha.");
         }
         return;
       }
 
-      // 3) limpa sessão temporária do Supabase
       await supabase.auth.signOut();
-
       toast.success("Senha alterada com sucesso.");
-      setPwdOpen(false);
-      router.push("/login");
-    } catch (e: any) {
-      toast.error(e?.message || "Erro inesperado ao alterar a senha.");
+      setPasswordDialogOpen(false);
+      window.location.assign("/login");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro inesperado ao alterar a senha.",
+      );
     } finally {
-      setSavingPwd(false);
+      setSavingPassword(false);
     }
   };
 
@@ -120,21 +136,31 @@ export function NavUser({ user }: { user: { nome: string; email: string } }) {
       <SidebarMenu>
         <SidebarMenuItem>
           <DropdownMenu>
-            <DropdownMenuTrigger render={
-              <SidebarMenuButton
-                size="lg"
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-              >
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.nome}</span>
-                  <span className="truncate text-xs">{user.email}</span>
-                </div>
-                <ChevronsUpDown className="ml-auto size-4" />
-              </SidebarMenuButton>
-            } />
+            <DropdownMenuTrigger
+              render={
+                <SidebarMenuButton
+                  size="lg"
+                  title={`${user.nome} — ${user.email}`}
+                  className="cursor-pointer data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center"
+                />
+              }
+            >
+              <Avatar className="size-8">
+                <AvatarFallback className="bg-sidebar-primary/20 font-semibold text-sidebar-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                <span className="truncate font-medium">{user.nome}</span>
+                <span className="truncate text-xs text-sidebar-foreground/70">
+                  {user.email}
+                </span>
+              </div>
+              <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
+            </DropdownMenuTrigger>
 
             <DropdownMenuContent
-              className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+              className="w-(--anchor-width) min-w-56 rounded-lg"
               side={isMobile ? "bottom" : "right"}
               align="end"
               sideOffset={4}
@@ -142,9 +168,14 @@ export function NavUser({ user }: { user: { nome: string; email: string } }) {
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="p-0 font-normal">
                   <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <div className="grid flex-1 text-left text-sm leading-tight">
+                    <Avatar className="size-8">
+                      <AvatarFallback>{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
                       <span className="truncate font-medium">{user.nome}</span>
-                      <span className="truncate text-xs">{user.email}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {user.email}
+                      </span>
                     </div>
                   </div>
                 </DropdownMenuLabel>
@@ -153,13 +184,10 @@ export function NavUser({ user }: { user: { nome: string; email: string } }) {
               <DropdownMenuSeparator />
 
               <DropdownMenuGroup>
-
-                {/* Alterar senha */}
                 <DropdownMenuItem
-                  onClick={(e) => {
-                    e.preventDefault();
-                    console.log("Opening change password modal...");
-                    openChangePwd();
+                  onClick={(event) => {
+                    event.preventDefault();
+                    openChangePassword();
                   }}
                 >
                   <KeyRound />
@@ -170,17 +198,9 @@ export function NavUser({ user }: { user: { nome: string; email: string } }) {
               <DropdownMenuSeparator />
 
               <DropdownMenuItem
-                onClick={async (e) => {
-                  e.preventDefault();
-                  console.log("Logging out...");
-                  try {
-                    await supabase.auth.signOut();
-                    console.log("Supabase signOut completed.");
-                  } catch (err) {
-                    console.error("Error signing out:", err);
-                  }
-                  // Usar window.location para garantir limpeza total e redirecionamento
-                  window.location.href = "/login";
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleLogout();
                 }}
               >
                 <LogOut />
@@ -191,12 +211,13 @@ export function NavUser({ user }: { user: { nome: string; email: string } }) {
         </SidebarMenuItem>
       </SidebarMenu>
 
-      {/* Modal Alterar Senha */}
-      <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Alterar senha</DialogTitle>
-            <DialogDescription>Informe sua senha atual e defina uma nova.</DialogDescription>
+            <DialogDescription>
+              Informe sua senha atual e defina uma nova.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-3 py-2">
@@ -205,10 +226,10 @@ export function NavUser({ user }: { user: { nome: string; email: string } }) {
               <Input
                 id="senha-atual"
                 type="password"
-                value={currentPwd}
-                onChange={(e) => setCurrentPwd(e.target.value)}
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
                 placeholder="••••••••"
-                disabled={savingPwd}
+                disabled={savingPassword}
               />
             </div>
 
@@ -217,11 +238,11 @@ export function NavUser({ user }: { user: { nome: string; email: string } }) {
               <Input
                 id="nova-senha"
                 type="password"
-                value={pwd}
-                onChange={(e) => setPwd(e.target.value)}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
                 minLength={8}
-                disabled={savingPwd}
+                disabled={savingPassword}
               />
             </div>
 
@@ -230,21 +251,25 @@ export function NavUser({ user }: { user: { nome: string; email: string } }) {
               <Input
                 id="confirma-senha"
                 type="password"
-                value={pwd2}
-                onChange={(e) => setPwd2(e.target.value)}
+                value={passwordConfirmation}
+                onChange={(event) => setPasswordConfirmation(event.target.value)}
                 placeholder="••••••••"
                 minLength={8}
-                disabled={savingPwd}
+                disabled={savingPassword}
               />
             </div>
           </div>
 
           <DialogFooter className="gap-2 sm:space-x-2">
-            <Button variant="outline" onClick={() => setPwdOpen(false)} disabled={savingPwd}>
+            <Button
+              variant="outline"
+              onClick={() => setPasswordDialogOpen(false)}
+              disabled={savingPassword}
+            >
               Cancelar
             </Button>
-            <Button onClick={handleChangePassword} disabled={savingPwd}>
-              {savingPwd ? (
+            <Button onClick={handleChangePassword} disabled={savingPassword}>
+              {savingPassword ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando…
                 </>

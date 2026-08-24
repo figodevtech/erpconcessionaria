@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server"
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/sidebar/app-sidebar"
 import {
@@ -29,6 +30,8 @@ export default async function DashboardLayout({
     .single()
 
   const permissions = await getMyPermissions()
+  const cookieStore = await cookies()
+  const defaultSidebarOpen = cookieStore.get("sidebar_state")?.value !== "false"
 
   const mappedUser = {
     nome: profile?.name || user.user_metadata?.name || user.email?.split('@')[0] || "Usuário",
@@ -37,7 +40,7 @@ export default async function DashboardLayout({
 
   return (
     <PermissionsProvider permissions={permissions}>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={defaultSidebarOpen}>
         <AppSidebar user={mappedUser} permissions={permissions} />
         <SidebarInset className="min-w-0 overflow-hidden">
           <DashboardHeader />
