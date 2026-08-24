@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const
+const INITIAL_CHART_DIMENSION = { width: 1, height: 1 }
 
 export type ChartConfig = {
   [k in string]: {
@@ -61,7 +62,9 @@ function ChartContainer({
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
+        <RechartsPrimitive.ResponsiveContainer
+          initialDimension={INITIAL_CHART_DIMENSION}
+        >
           {children}
         </RechartsPrimitive.ResponsiveContainer>
       </div>

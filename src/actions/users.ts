@@ -178,3 +178,36 @@ export async function getUserKPIsAction() {
     }
   }
 }
+
+/**
+ * Single round trip for the users screen.
+ *
+ * The router serializes server actions, so requesting the list, the roles and
+ * the KPIs separately turned three independent queries into a sequential
+ * waterfall on every visit to the module.
+ */
+export async function getUsersPageDataAction(params?: {
+  page?: number,
+  pageSize?: number,
+  search?: string
+}) {
+  const { getRolesAction } = await import("@/actions/roles")
+
+  const [list, roles, kpis] = await Promise.all([
+    listUsersAction(params),
+    getRolesAction(),
+    getUserKPIsAction(),
+  ])
+
+  if (!list.success) return { success: false as const, error: list.error }
+
+  return {
+    success: true as const,
+    data: {
+      users: list.data ?? [],
+      count: list.count ?? 0,
+      roles: roles.success ? roles.data ?? [] : [],
+      kpis: kpis.success ? kpis.data ?? null : null,
+    },
+  }
+}

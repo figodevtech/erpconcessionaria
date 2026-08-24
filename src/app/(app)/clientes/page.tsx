@@ -1,13 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { AccessDenied } from "@/components/access-denied";
 import { ModuleKpiSkeleton } from "@/components/module/module-kpi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCustomerKpisAction, listCustomersAction } from "@/actions/customers";
+import { getCustomersPageDataAction } from "@/actions/customers";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useLazyMount } from "@/hooks/use-lazy-mount";
 import { usePermissions } from "@/hooks/use-permissions";
 import type {
   Customer,
@@ -15,10 +18,15 @@ import type {
   CustomerPersonType,
   CustomerStatus,
 } from "@/lib/customers";
-import { CustomerDialog } from "./components/customer-dialog";
 import { CustomerFilters } from "./components/customer-filters";
 import { CustomerKpis } from "./components/customer-kpis";
 import { CustomerTable } from "./components/customer-table";
+
+// Only loaded the first time the user opens the customer form.
+const CustomerDialog = dynamic(
+  () => import("./components/customer-dialog").then((mod) => mod.CustomerDialog),
+  { ssr: false },
+)
 
 const pageSize = 12;
 
@@ -34,36 +42,37 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const debouncedSearch = useDebouncedValue(search);
+  const shouldMountCustomerDialog = useLazyMount(dialogOpen);
+
   const canView = hasPermission("customers:view");
   const canCreate = hasPermission("customers:create");
 
-  const fetchCustomers = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
-    const result = await listCustomersAction({ page, pageSize, search, status, personType });
-    if (result.success) {
-      setCustomers(result.data ?? []);
-      setCount(result.count ?? 0);
+    const result = await getCustomersPageDataAction({
+      page,
+      pageSize,
+      search: debouncedSearch,
+      status,
+      personType,
+    });
+
+    if (result.success && result.data) {
+      setCustomers(result.data.customers);
+      setCount(result.data.count);
+      setKpis(result.data.kpis);
     } else {
       toast.error(result.error ?? "Erro ao carregar clientes");
     }
     setLoading(false);
-  }, [page, personType, search, status]);
-
-  const fetchKpis = useCallback(async () => {
-    const result = await getCustomerKpisAction();
-    if (result.success && result.data) {
-      setKpis(result.data);
-    }
-  }, []);
-
-  const refresh = useCallback(() => {
-    fetchCustomers();
-    fetchKpis();
-  }, [fetchCustomers, fetchKpis]);
+  }, [debouncedSearch, page, personType, status]);
 
   useEffect(() => {
     if (!canView) return;
-    const timeout = setTimeout(refresh, 150);
+    // Deferred by a tick (not debounced) so the loading flag does not cascade
+    // an extra render inside the effect.
+    const timeout = setTimeout(refresh, 0);
     return () => clearTimeout(timeout);
   }, [canView, refresh]);
 
@@ -136,11 +145,13 @@ export default function ClientesPage() {
         </CardContent>
       </Card>
 
-      <CustomerDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSuccess={refresh}
-      />
+      {shouldMountCustomerDialog ? (
+        <CustomerDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSuccess={refresh}
+        />
+      ) : null}
     </div>
   );
 }

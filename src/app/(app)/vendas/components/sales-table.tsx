@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useTransition, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { toast } from "sonner"
 import { Car, Eye, MoreHorizontal, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -34,8 +35,18 @@ import { usePermissions } from "@/hooks/use-permissions"
 import { listSalesAction, cancelVehicleSaleAction } from "@/actions/sales"
 import { formatCurrency } from "@/lib/utils"
 import { SalesPagination } from "./sales-pagination"
-import { SaleDialog } from "./sale-dialog"
-import { VehicleDialog } from "../../veiculos/components/vehicle-dialog"
+import { useLazyMount } from "@/hooks/use-lazy-mount"
+
+// Both dialogs are large trees that only matter once a row is opened.
+const SaleDialog = dynamic(
+  () => import("./sale-dialog").then((mod) => mod.SaleDialog),
+  { ssr: false },
+)
+
+const VehicleDialog = dynamic(
+  () => import("../../veiculos/components/vehicle-dialog").then((mod) => mod.VehicleDialog),
+  { ssr: false },
+)
 import type { Vehicle } from "../../veiculos/components/vehicle-list-client"
 
 interface Sale {
@@ -75,6 +86,9 @@ export function SalesTable({
 
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
   const [viewSaleId, setViewSaleId] = useState<number | null>(null)
+
+  const shouldMountSaleDialog = useLazyMount(!!viewSaleId)
+  const shouldMountVehicleDialog = useLazyMount(!!selectedVehicle)
   const [saleToCancel, setSaleToCancel] = useState<Sale | null>(null)
 
   const pageSize = 12
@@ -256,25 +270,29 @@ export function SalesTable({
         />
       </div>
 
-      <SaleDialog
-        open={!!viewSaleId}
-        onOpenChange={(open) => !open && setViewSaleId(null)}
-        saleId={viewSaleId}
-        onChanged={() => {
-          fetchData()
-          if (onKpisShouldRefresh) onKpisShouldRefresh()
-        }}
-      />
+      {shouldMountSaleDialog ? (
+        <SaleDialog
+          open={!!viewSaleId}
+          onOpenChange={(open) => !open && setViewSaleId(null)}
+          saleId={viewSaleId}
+          onChanged={() => {
+            fetchData()
+            if (onKpisShouldRefresh) onKpisShouldRefresh()
+          }}
+        />
+      ) : null}
 
-      <VehicleDialog
-        open={!!selectedVehicle}
-        onOpenChange={(open) => !open && setSelectedVehicle(null)}
-        vehicle={selectedVehicle}
-        onSuccess={() => {
-          fetchData()
-          if (onKpisShouldRefresh) onKpisShouldRefresh()
-        }}
-      />
+      {shouldMountVehicleDialog ? (
+        <VehicleDialog
+          open={!!selectedVehicle}
+          onOpenChange={(open) => !open && setSelectedVehicle(null)}
+          vehicle={selectedVehicle}
+          onSuccess={() => {
+            fetchData()
+            if (onKpisShouldRefresh) onKpisShouldRefresh()
+          }}
+        />
+      ) : null}
 
       <AlertDialog
         open={!!saleToCancel}

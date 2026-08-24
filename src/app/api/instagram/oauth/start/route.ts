@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
 import { buildInstagramAuthorizationUrl, createInstagramOAuthState } from "@/lib/instagram/oauth";
-import { checkPermission } from "@/utils/permissions";
+import { getVerifiedUser, checkPermission } from "@/utils/permissions";
 
 const STATE_COOKIE = "instagram_oauth_state";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

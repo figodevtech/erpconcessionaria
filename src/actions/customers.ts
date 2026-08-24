@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/utils/supabase/server";
-import { checkPermission } from "@/utils/permissions";
+import { getVerifiedUser, checkPermission } from "@/utils/permissions";
 import {
   CUSTOMER_PERSON_TYPES,
   CUSTOMER_STATUSES,
@@ -117,12 +117,9 @@ function customerDatabaseError(message: string) {
   return message;
 }
 
-export async function listCustomersAction(
-  filters: CustomerFilters = {},
+async function queryCustomers(
+  filters: CustomerFilters,
 ): Promise<ActionResult<Customer[]>> {
-  const allowed = await checkPermission("customers:view");
-  if (!allowed) return { success: false, error: "Voce nao tem permissao para visualizar clientes." };
-
   const supabase = await createClient();
   const page = filters.page ?? 1;
   const pageSize = filters.pageSize ?? 10;
@@ -166,10 +163,7 @@ export async function listCustomersAction(
   };
 }
 
-export async function getCustomerKpisAction(): Promise<ActionResult<CustomerKpis>> {
-  const allowed = await checkPermission("customers:view");
-  if (!allowed) return { success: false, error: "Voce nao tem permissao para visualizar clientes." };
-
+async function queryCustomerKpis(): Promise<ActionResult<CustomerKpis>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("customers")
@@ -190,6 +184,59 @@ export async function getCustomerKpisAction(): Promise<ActionResult<CustomerKpis
   };
 }
 
+export type CustomersPageData = {
+  customers: Customer[];
+  count: number;
+  kpis: CustomerKpis;
+};
+
+export async function listCustomersAction(
+  filters: CustomerFilters = {},
+): Promise<ActionResult<Customer[]>> {
+  const allowed = await checkPermission("customers:view");
+  if (!allowed) return { success: false, error: "Voce nao tem permissao para visualizar clientes." };
+
+  return queryCustomers(filters);
+}
+
+export async function getCustomerKpisAction(): Promise<ActionResult<CustomerKpis>> {
+  const allowed = await checkPermission("customers:view");
+  if (!allowed) return { success: false, error: "Voce nao tem permissao para visualizar clientes." };
+
+  return queryCustomerKpis();
+}
+
+/**
+ * Single round trip for the customers screen.
+ *
+ * The router serializes server actions, so fetching the list and the KPIs as
+ * two separate actions turns them into a sequential waterfall. Bundling them
+ * also collapses the two permission checks into one.
+ */
+export async function getCustomersPageDataAction(
+  filters: CustomerFilters = {},
+): Promise<ActionResult<CustomersPageData>> {
+  const allowed = await checkPermission("customers:view");
+  if (!allowed) return { success: false, error: "Voce nao tem permissao para visualizar clientes." };
+
+  const [list, kpis] = await Promise.all([
+    queryCustomers(filters),
+    queryCustomerKpis(),
+  ]);
+
+  if (!list.success) return { success: false, error: list.error };
+  if (!kpis.success || !kpis.data) return { success: false, error: kpis.error };
+
+  return {
+    success: true,
+    data: {
+      customers: list.data ?? [],
+      count: list.count ?? 0,
+      kpis: kpis.data,
+    },
+  };
+}
+
 export async function createCustomerAction(
   values: CustomerFormValues,
 ): Promise<ActionResult<Customer>> {
@@ -197,9 +244,7 @@ export async function createCustomerAction(
   if (!allowed) return { success: false, error: "Voce nao tem permissao para criar clientes." };
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
   if (!user) return { success: false, error: "Usuario nao autenticado." };
 
@@ -231,9 +276,7 @@ export async function updateCustomerAction(
   if (!allowed) return { success: false, error: "Voce nao tem permissao para editar clientes." };
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
   if (!user) return { success: false, error: "Usuario nao autenticado." };
 
@@ -263,10 +306,7 @@ export async function deleteCustomerAction(id: number) {
   const allowed = await checkPermission("customers:delete");
   if (!allowed) return { success: false, error: "Voce nao tem permissao para excluir clientes." };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
   if (!user) return { success: false, error: "Usuario nao autenticado." };
 

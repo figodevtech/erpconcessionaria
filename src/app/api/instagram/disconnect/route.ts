@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
 import { disconnectInstagramAccount } from "@/lib/instagram/oauth";
-import { checkPermission } from "@/utils/permissions";
+import { getVerifiedUser, checkPermission } from "@/utils/permissions";
 
 export async function POST() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: "Faça login para remover a conexão do Instagram." }, { status: 401 });
   }
 

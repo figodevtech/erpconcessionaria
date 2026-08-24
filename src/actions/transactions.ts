@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/utils/supabase/server";
-import { checkPermission } from "@/utils/permissions";
+import { getVerifiedUser, checkPermission } from "@/utils/permissions";
 import type {
   PaymentMethod,
   Transaction,
@@ -220,15 +220,46 @@ export async function getTransactionKpisAction(
   };
 }
 
+export type CashFlowPageData = {
+  transactions: Transaction[];
+  count: number;
+  kpis: TransactionKpis;
+};
+
+/**
+ * Single round trip for the cash flow screen.
+ *
+ * The router serializes server actions, so calling the list and the KPI actions
+ * separately from the client turns two independent queries into a sequential
+ * waterfall. Bundling them keeps the queries parallel on the server.
+ */
+export async function getCashFlowPageDataAction(
+  filters: TransactionFilters = {},
+): Promise<ActionResult<CashFlowPageData>> {
+  const [list, kpis] = await Promise.all([
+    listTransactionsAction(filters),
+    getTransactionKpisAction(filters.vehicleId),
+  ]);
+
+  if (!list.success) return { success: false, error: list.error };
+  if (!kpis.success || !kpis.data) return { success: false, error: kpis.error };
+
+  return {
+    success: true,
+    data: {
+      transactions: list.data ?? [],
+      count: list.count ?? 0,
+      kpis: kpis.data,
+    },
+  };
+}
+
 export async function createTransactionAction(
   input: TransactionFormValues | FormData,
 ): Promise<ActionResult<Transaction>> {
   const values = input instanceof FormData ? formDataToTransactionValues(input) : input;
   const attachment = getAttachment(input);
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
   if (!user) return { success: false, error: "Usuário não autenticado." };
 
@@ -430,10 +461,7 @@ export async function createTransactionAction(
 }
 
 export async function softDeleteTransactionAction(id: number) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
   if (!user) return { success: false, error: "Usuário não autenticado." };
 
@@ -537,10 +565,7 @@ export async function softDeleteTransactionAction(id: number) {
 }
 
 export async function getTransactionAttachmentUrlAction(id: number): Promise<ActionResult<string>> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
   if (!user) return { success: false, error: "Usuário não autenticado." };
 

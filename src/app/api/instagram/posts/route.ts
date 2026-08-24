@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getVerifiedUser } from "@/utils/permissions";
 import {
   getInstagramAccessTokenForUser,
   InstagramApiError,
@@ -8,13 +8,9 @@ import {
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const user = await getVerifiedUser();
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Faça login para listar postagens." }, { status: 401 });
     }
 

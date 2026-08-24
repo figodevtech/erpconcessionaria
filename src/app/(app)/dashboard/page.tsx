@@ -1,7 +1,6 @@
 import { createClient } from "@/utils/supabase/server"
 import { VehicleKpiCards } from "./components/vehicle-kpi-cards"
-import { VehicleStatusChart } from "./components/vehicle-status-chart"
-import { VehicleBrandChart } from "./components/vehicle-brand-chart"
+import { DashboardCharts } from "./components/dashboard-charts"
 import { checkPermission } from "@/utils/permissions"
 import { AccessDenied } from "@/components/access-denied"
 import { isVehicleAvailableStatus } from "@/lib/vehicle-status"
@@ -75,10 +74,7 @@ export default async function Dashboard() {
 
       <VehicleKpiCards data={kpis} />
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
-        <VehicleBrandChart data={brandData} />
-        <VehicleStatusChart data={statusData} />
-      </div>
+      <DashboardCharts brandData={brandData} statusData={statusData} />
     </main>
   )
 }

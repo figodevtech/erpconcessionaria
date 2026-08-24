@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
-import { checkPermission } from "@/utils/permissions";
+import { getVerifiedUser, checkPermission } from "@/utils/permissions";
 import { isVehicleAvailableStatus, isVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
 
 export type VehicleKpisData = {
@@ -78,12 +78,9 @@ export async function updateVehicleStatusesAction(input: {
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
-  if (authError || !user) {
+  if (!user) {
     return { success: false, error: "Sessão inválida. Entre novamente para continuar." };
   }
 

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/utils/supabase/server";
 import { findImagesByShortcode, getInstagramAccessTokenForUser, InstagramApiError } from "@/lib/instagram/api";
 import {
   extractInstagramImagesFromPublicPost,
@@ -8,6 +7,7 @@ import {
   parseInstagramPostUrl,
 } from "@/lib/instagram/extract-instagram-images";
 import type { InstagramExtractResponse } from "@/types/instagram";
+import { getVerifiedUser } from "@/utils/permissions";
 
 const extractSchema = z.object({
   url: z.string().trim().min(1),
@@ -24,10 +24,7 @@ export async function POST(request: Request) {
     }
 
     const { shortcode } = parseInstagramPostUrl(body.data.url);
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getVerifiedUser();
 
     if (user) {
       const accessToken = await getInstagramAccessTokenForUser(user.id).catch((error) => {

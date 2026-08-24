@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { Building2, Edit, IdCard, MoreHorizontal, Phone, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { deleteCustomerAction } from "@/actions/customers";
@@ -31,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useLazyMount } from "@/hooks/use-lazy-mount";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   customerPersonTypeLabel,
@@ -40,7 +42,12 @@ import {
   type Customer,
 } from "@/lib/customers";
 import { VehiclePagination } from "@/app/(app)/veiculos/components/vehicle-pagination";
-import { CustomerDialog } from "./customer-dialog";
+
+// Only loaded the first time a row is opened for editing.
+const CustomerDialog = dynamic(
+  () => import("./customer-dialog").then((mod) => mod.CustomerDialog),
+  { ssr: false },
+)
 
 type CustomerTableProps = {
   customers: Customer[];
@@ -63,6 +70,7 @@ export function CustomerTable({
 }: CustomerTableProps) {
   const { hasPermission } = usePermissions();
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const shouldMountCustomerDialog = useLazyMount(!!selectedCustomer);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -189,12 +197,14 @@ export function CustomerTable({
         <VehiclePagination page={page} totalPages={totalPages} setPage={setPage} />
       )}
 
-      <CustomerDialog
-        open={!!selectedCustomer}
-        onOpenChange={(open) => !open && setSelectedCustomer(null)}
-        customer={selectedCustomer}
-        onSuccess={onSuccess}
-      />
+      {shouldMountCustomerDialog ? (
+        <CustomerDialog
+          open={!!selectedCustomer}
+          onOpenChange={(open) => !open && setSelectedCustomer(null)}
+          customer={selectedCustomer}
+          onSuccess={onSuccess}
+        />
+      ) : null}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

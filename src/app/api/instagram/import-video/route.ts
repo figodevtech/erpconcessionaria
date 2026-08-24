@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createAdminClient, createClient } from "@/utils/supabase/server";
 import { findVideoByShortcode, getInstagramAccessTokenForUser, InstagramApiError } from "@/lib/instagram/api";
 import { parseInstagramPostUrl } from "@/lib/instagram/extract-instagram-images";
+import { getVerifiedUser } from "@/utils/permissions";
 import {
   downloadInstagramVideo,
   extensionFromVideoContentType,
@@ -28,12 +29,9 @@ function storagePathFromPublicUrl(publicUrl: string) {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const user = await getVerifiedUser();
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Faça login para importar vídeos." }, { status: 401 });
     }
 

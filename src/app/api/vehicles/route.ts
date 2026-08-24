@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { getVerifiedUser } from "@/utils/permissions";
 
 export async function GET(request: Request) {
   try {
@@ -130,8 +131,8 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     
     // Get current user for created_by
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const user = await getVerifiedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -164,8 +165,8 @@ export async function PATCH(request: Request) {
     const supabase = await createClient();
     
     // Get current user for updated_by
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const user = await getVerifiedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -207,8 +208,8 @@ export async function DELETE(request: Request) {
     const supabase = await createClient();
     
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const user = await getVerifiedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

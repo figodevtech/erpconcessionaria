@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { VehicleTable } from "./vehicle-table"
 import { VehiclePagination } from "./vehicle-pagination"
 import { VehicleCard } from "./vehicle-card"
@@ -15,8 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { motion, AnimatePresence } from "framer-motion"
-import { VehicleDialog } from "./vehicle-dialog"
-import { VehicleBulkStatusDialog } from "./vehicle-bulk-status-dialog"
+import { useLazyMount } from "@/hooks/use-lazy-mount"
 import { usePermissions } from "@/hooks/use-permissions"
 import type { VehicleStatus } from "@/lib/vehicle-status";
 
@@ -83,6 +83,18 @@ export interface VehicleWithImages extends Vehicle {
 }
 
 
+// The vehicle form is by far the largest tree in the app; loading it only when
+// the dialog is first opened keeps the module route light.
+const VehicleDialog = dynamic(
+  () => import("./vehicle-dialog").then((mod) => mod.VehicleDialog),
+  { ssr: false },
+)
+
+const VehicleBulkStatusDialog = dynamic(
+  () => import("./vehicle-bulk-status-dialog").then((mod) => mod.VehicleBulkStatusDialog),
+  { ssr: false },
+)
+
 export type VehicleListClientProps = {
   search: string
   status: string
@@ -104,6 +116,9 @@ export function VehicleListClient({ search, status, page, setPage, onKpisShouldR
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<string>>(new Set())
   const [isBulkStatusDialogOpen, setIsBulkStatusDialogOpen] = useState(false)
+
+  const shouldMountVehicleDialog = useLazyMount(isDialogOpen)
+  const shouldMountBulkStatusDialog = useLazyMount(isBulkStatusDialogOpen)
 
   const canCreateVehicles = hasPermission("vehicles:create")
   const canUpdateVehicles = hasPermission("vehicles:update")
@@ -172,11 +187,7 @@ export function VehicleListClient({ search, status, page, setPage, onKpisShouldR
   }, [search, status, page, onKpisShouldRefresh])
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      fetchVehicles()
-    }, 300)
-
-    return () => clearTimeout(timeout)
+    fetchVehicles()
   }, [fetchVehicles])
 
   const selectedVehicleIdList = Array.from(selectedVehicleIds)
@@ -308,18 +319,22 @@ export function VehicleListClient({ search, status, page, setPage, onKpisShouldR
             ) : null}
           </div>
         </div>
-        <VehicleDialog
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-          vehicle={selectedVehicle}
-          onSuccess={(v) => fetchVehicles(v)}
-        />
-        <VehicleBulkStatusDialog
-          open={isBulkStatusDialogOpen}
-          onOpenChange={setIsBulkStatusDialogOpen}
-          selectedVehicleIds={selectedVehicleIdList}
-          onSuccess={handleBulkStatusSuccess}
-        />
+        {shouldMountVehicleDialog ? (
+          <VehicleDialog
+            open={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            vehicle={selectedVehicle}
+            onSuccess={(v) => fetchVehicles(v)}
+          />
+        ) : null}
+        {shouldMountBulkStatusDialog ? (
+          <VehicleBulkStatusDialog
+            open={isBulkStatusDialogOpen}
+            onOpenChange={setIsBulkStatusDialogOpen}
+            selectedVehicleIds={selectedVehicleIdList}
+            onSuccess={handleBulkStatusSuccess}
+          />
+        ) : null}
       </header>
       <div className="relative min-h-[300px] min-w-0 overflow-hidden px-3 pb-3 pt-4 sm:px-5 sm:pb-4">
         <div

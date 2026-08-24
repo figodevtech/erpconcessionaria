@@ -1,4 +1,3 @@
-import { createClient } from "@/utils/supabase/server"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/sidebar/app-sidebar"
@@ -7,7 +6,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { getMyPermissions } from "@/utils/permissions"
+import { getAuthContext } from "@/utils/permissions"
 import { PermissionsProvider } from "@/components/permissions-provider"
 
 export default async function DashboardLayout({
@@ -15,27 +14,20 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  // Single round trip: user, profile name, role and permissions come from the
+  // same request-scoped cache the pages and server actions reuse.
+  const { userId, email, name, permissions } = await getAuthContext()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!userId) {
     redirect("/login")
   }
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name')
-    .eq('id', user.id)
-    .single()
-
-  const permissions = await getMyPermissions()
   const cookieStore = await cookies()
   const defaultSidebarOpen = cookieStore.get("sidebar_state")?.value !== "false"
 
   const mappedUser = {
-    nome: profile?.name || user.user_metadata?.name || user.email?.split('@')[0] || "Usuário",
-    email: user.email || "",
+    nome: name || email?.split('@')[0] || "Usuário",
+    email: email || "",
   }
 
   return (

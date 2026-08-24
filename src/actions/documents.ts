@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/utils/supabase/server";
-import { checkPermission } from "@/utils/permissions";
+import { getVerifiedUser, checkPermission } from "@/utils/permissions";
 import type { VehicleDocument } from "@/lib/documents";
 
 const BUCKET = "vehicle-documents";
@@ -34,10 +34,7 @@ function sanitizeFileName(name: string) {
 }
 
 async function requireAdmin(permission: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser();
 
   if (!user) return { error: "Usuário não autenticado.", user: null, admin: null };
 

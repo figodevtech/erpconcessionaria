@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -19,10 +20,9 @@ import {
   updateBankAccountStatusAction,
 } from "@/actions/type-catalog";
 import { listTransactionsAction } from "@/actions/transactions";
-import { TypeCreateDialog, type TypeEditTarget } from "@/app/(app)/tipos/components/type-create-dialog";
+import type { TypeEditTarget } from "@/app/(app)/tipos/components/type-create-dialog";
 import { VehiclePagination } from "@/app/(app)/veiculos/components/vehicle-pagination";
 import { AccessDenied } from "@/components/access-denied";
-import { TransactionDialog } from "@/components/finance/transaction-dialog";
 import { TransactionTable } from "@/components/finance/transaction-table";
 import { ModuleKpi, ModuleKpiSkeleton } from "@/components/module/module-kpi";
 import {
@@ -56,11 +56,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useLazyMount } from "@/hooks/use-lazy-mount";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { BankAccountSummary, BankDashboardKpis } from "@/lib/banks";
 import { bankAccountTypeLabel } from "@/lib/type-catalog";
 import type { Transaction } from "@/lib/transactions";
 import { formatCurrency } from "@/lib/utils";
+
+// Both dialogs stay out of the module chunk until they are first opened.
+const TypeCreateDialog = dynamic(
+  () => import("@/app/(app)/tipos/components/type-create-dialog").then((mod) => mod.TypeCreateDialog),
+  { ssr: false },
+)
+
+const TransactionDialog = dynamic(
+  () => import("@/components/finance/transaction-dialog").then((mod) => mod.TransactionDialog),
+  { ssr: false },
+)
 
 const pageSize = 8;
 
@@ -80,6 +93,10 @@ export default function BanksPage() {
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
 
+  const debouncedSearch = useDebouncedValue(search);
+  const shouldMountBankDialog = useLazyMount(bankDialogOpen);
+  const shouldMountTransactionDialog = useLazyMount(transactionDialogOpen);
+
   const canView = hasPermission("finance:view");
   const canCreateBank = hasPermission("types:create");
   const canUpdateBank = hasPermission("types:update");
@@ -88,7 +105,7 @@ export default function BanksPage() {
 
   const fetchBanks = useCallback(async () => {
     setLoadingBanks(true);
-    const result = await listBankAccountsDashboardAction({ search, status });
+    const result = await listBankAccountsDashboardAction({ search: debouncedSearch, status });
 
     if (result.success && result.data) {
       setBanks(result.data.banks);
@@ -102,7 +119,7 @@ export default function BanksPage() {
     }
 
     setLoadingBanks(false);
-  }, [search, status]);
+  }, [debouncedSearch, status]);
 
   const fetchTransactions = useCallback(async () => {
     if (!selectedBankId) {
@@ -130,7 +147,7 @@ export default function BanksPage() {
 
   useEffect(() => {
     if (!canView) return;
-    const timeout = setTimeout(fetchBanks, 200);
+    const timeout = setTimeout(fetchBanks, 0);
     return () => clearTimeout(timeout);
   }, [canView, fetchBanks]);
 
@@ -259,28 +276,32 @@ export default function BanksPage() {
         </CardContent>
       </Card>
 
-      <TypeCreateDialog
-        mode={bankDialogOpen ? "bank" : null}
-        target={bankDialogTarget}
-        onOpenChange={(open) => {
-          setBankDialogOpen(open);
-          if (!open) setBankDialogTarget(null);
-        }}
-        onSuccess={() => {
-          setBankDialogOpen(false);
-          setBankDialogTarget(null);
-          fetchBanks();
-        }}
-      />
+      {shouldMountBankDialog ? (
+        <TypeCreateDialog
+          mode={bankDialogOpen ? "bank" : null}
+          target={bankDialogTarget}
+          onOpenChange={(open) => {
+            setBankDialogOpen(open);
+            if (!open) setBankDialogTarget(null);
+          }}
+          onSuccess={() => {
+            setBankDialogOpen(false);
+            setBankDialogTarget(null);
+            fetchBanks();
+          }}
+        />
+      ) : null}
 
-      <TransactionDialog
-        open={transactionDialogOpen}
-        onOpenChange={setTransactionDialogOpen}
-        onSuccess={() => {
-          setTransactionDialogOpen(false);
-          refreshAll();
-        }}
-      />
+      {shouldMountTransactionDialog ? (
+        <TransactionDialog
+          open={transactionDialogOpen}
+          onOpenChange={setTransactionDialogOpen}
+          onSuccess={() => {
+            setTransactionDialogOpen(false);
+            refreshAll();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

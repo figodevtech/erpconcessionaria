@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createAdminClient, createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { downloadInstagramImage, extensionFromContentType, InstagramImageDownloadError } from "@/lib/instagram/download-instagram-image";
 import { findImagesByShortcode, getInstagramAccessTokenForUser, InstagramApiError } from "@/lib/instagram/api";
 import {
@@ -9,6 +9,7 @@ import {
   parseInstagramPostUrl,
 } from "@/lib/instagram/extract-instagram-images";
 import type { InstagramImportResponse } from "@/types/instagram";
+import { getVerifiedUser } from "@/utils/permissions";
 
 const MAX_IMPORT_IMAGES = 10;
 
@@ -49,13 +50,9 @@ async function getNextVehicleImageSortOrder(
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const user = await getVerifiedUser();
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { success: false, message: "Faça login para importar imagens." },
         { status: 401 },

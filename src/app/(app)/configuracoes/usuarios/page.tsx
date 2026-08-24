@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react";
-import { getRolesAction } from "@/actions/roles";
 import { UserKPIs } from "./components/user-kpis";
 import { UserManagerClient } from "./components/user-manager-client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +8,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserFilters } from "./components/user-filters";
-import { listUsersAction, getUserKPIsAction } from "@/actions/users";
+import { getUsersPageDataAction } from "@/actions/users";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserDialog } from "./components/user-dialog";
@@ -38,6 +38,7 @@ export default function UsersPage() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -51,37 +52,20 @@ export default function UsersPage() {
     inactiveUsers: number;
   } | null>(null);
 
-  const fetchUsers = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
-    const result = await listUsersAction({ page, pageSize, search });
-    if (result.success) {
-      setUsers(result.data || []);
-      setCount(result.count || 0);
+    const result = await getUsersPageDataAction({ page, pageSize, search: debouncedSearch });
+    if (result.success && result.data) {
+      setUsers(result.data.users);
+      setCount(result.data.count);
+      setRoles(result.data.roles);
+      setKpiData(result.data.kpis);
     }
     setLoading(false);
-  }, [page, search]);
-
-  const fetchRoles = useCallback(async () => {
-    const { data } = await getRolesAction();
-    setRoles(data || []);
-  }, []);
-
-  const fetchKPIs = useCallback(async () => {
-    const result = await getUserKPIsAction();
-    if (result.success) {
-      setKpiData(result.data || null);
-    }
-  }, []);
-
-  const refresh = useCallback(() => {
-    fetchUsers();
-    fetchRoles();
-    fetchKPIs();
-  }, [fetchUsers, fetchRoles, fetchKPIs]);
+  }, [debouncedSearch, page]);
 
   useEffect(() => {
-    const timeout = setTimeout(refresh, 100);
-
+    const timeout = setTimeout(refresh, 0);
     return () => clearTimeout(timeout);
   }, [refresh]);
 

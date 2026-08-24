@@ -146,3 +146,34 @@ export async function getProfileKPIsAction() {
     }
   }
 }
+
+/**
+ * Single round trip for the profiles screen.
+ *
+ * The router serializes server actions, so requesting the list, the KPIs and
+ * the permission catalog separately turned three independent queries into a
+ * sequential waterfall on every visit to the module.
+ */
+export async function getProfilesPageDataAction(params?: {
+  page?: number,
+  pageSize?: number,
+  search?: string
+}) {
+  const [roles, kpis, permissions] = await Promise.all([
+    getRolesAction(params),
+    getProfileKPIsAction(),
+    getPermissionsAction(),
+  ])
+
+  if (!roles.success) return { success: false as const, error: roles.error }
+
+  return {
+    success: true as const,
+    data: {
+      profiles: roles.data ?? [],
+      count: roles.count ?? 0,
+      kpis: kpis.success ? kpis.data ?? null : null,
+      permissions: permissions.success ? permissions.data ?? [] : [],
+    },
+  }
+}

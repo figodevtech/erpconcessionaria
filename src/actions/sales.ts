@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createAdminClient, createClient } from "@/utils/supabase/server"
+import { getVerifiedUser } from "@/utils/permissions";
 
 export async function getVehicleSaleAction(vehicleId: number) {
   const supabase = await createClient()
@@ -40,8 +41,8 @@ export async function registerVehicleSaleAction(formData: FormData) {
   const supabase = await createClient()
 
   // Authenticate user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getVerifiedUser()
+  if (!user) {
     return { success: false, error: "Usuário não autenticado." }
   }
 
@@ -109,11 +110,10 @@ export async function registerVehicleSaleAction(formData: FormData) {
 }
 
 export async function cancelVehicleSaleAction(saleId: number, vehicleId: number, deleteTransactions: boolean = false) {
-  const supabase = await createClient()
 
   // Authenticate user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getVerifiedUser()
+  if (!user) {
     return { success: false, error: "Usuário não autenticado." }
   }
 

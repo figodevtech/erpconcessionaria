@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
 import { extractInstagramShortcode } from "@/lib/instagram/extract-shortcode";
 import {
   findImagesByShortcode,
@@ -7,6 +6,7 @@ import {
   InstagramApiError,
 } from "@/lib/instagram/api";
 import type { InstagramMediaResponse } from "@/types/instagram";
+import { getVerifiedUser } from "@/utils/permissions";
 
 export async function POST(request: Request) {
   try {
@@ -21,13 +21,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const user = await getVerifiedUser();
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Faça login para buscar imagens do Instagram." }, { status: 401 });
     }
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Loader2, Plus, Search } from "lucide-react";
 import { AccessDenied } from "@/components/access-denied";
-import { TransactionDialog } from "@/components/finance/transaction-dialog";
 import { TransactionKpis } from "@/components/finance/transaction-kpis";
 import { TransactionTable } from "@/components/finance/transaction-table";
 import { ModuleKpiSkeleton } from "@/components/module/module-kpi";
@@ -18,9 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useLazyMount } from "@/hooks/use-lazy-mount";
 import { usePermissions } from "@/hooks/use-permissions";
-import { getTransactionKpisAction, listTransactionsAction } from "@/actions/transactions";
+import { getCashFlowPageDataAction } from "@/actions/transactions";
 import type { Transaction, TransactionKpis as TransactionKpisType, TransactionType } from "@/lib/transactions";
+
+// Only loaded the first time the user opens the transaction form.
+const TransactionDialog = dynamic(
+  () => import("@/components/finance/transaction-dialog").then((mod) => mod.TransactionDialog),
+  { ssr: false },
+)
 
 const pageSize = 12;
 
@@ -35,31 +43,35 @@ export default function CashFlowPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const debouncedSearch = useDebouncedValue(search);
+  const shouldMountTransactionDialog = useLazyMount(dialogOpen);
+
   const canView = hasPermission("finance:view");
   const canCreate = hasPermission("finance:create");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [listResult, kpiResult] = await Promise.all([
-      listTransactionsAction({ page, pageSize, search, tipo }),
-      getTransactionKpisAction(),
-    ]);
+    const result = await getCashFlowPageDataAction({
+      page,
+      pageSize,
+      search: debouncedSearch,
+      tipo,
+    });
 
-    if (listResult.success) {
-      setTransactions(listResult.data ?? []);
-      setCount(listResult.count ?? 0);
-    }
-
-    if (kpiResult.success && kpiResult.data) {
-      setKpis(kpiResult.data);
+    if (result.success && result.data) {
+      setTransactions(result.data.transactions);
+      setCount(result.data.count);
+      setKpis(result.data.kpis);
     }
 
     setLoading(false);
-  }, [page, search, tipo]);
+  }, [debouncedSearch, page, tipo]);
 
   useEffect(() => {
     if (!canView) return;
-    const timeout = setTimeout(fetchData, 200);
+    // Deferred by a tick (not debounced) so the loading flag does not cascade
+    // an extra render inside the effect.
+    const timeout = setTimeout(fetchData, 0);
     return () => clearTimeout(timeout);
   }, [canView, fetchData]);
 
@@ -150,7 +162,9 @@ export default function CashFlowPage() {
         </CardContent>
       </Card>
 
-      <TransactionDialog open={dialogOpen} onOpenChange={setDialogOpen} onSuccess={fetchData} />
+      {shouldMountTransactionDialog ? (
+        <TransactionDialog open={dialogOpen} onOpenChange={setDialogOpen} onSuccess={fetchData} />
+      ) : null}
     </div>
   );
 }

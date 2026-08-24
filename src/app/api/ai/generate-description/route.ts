@@ -1,15 +1,16 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { getVerifiedUser } from "@/utils/permissions";
 
 // OpenAI instance will be created inside the route handler
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = await getVerifiedUser();
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
@@ -185,7 +186,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getVerifiedUser();
 
     if (!user) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react";
-import { getRolesAction, getProfileKPIsAction, getPermissionsAction } from "@/actions/roles";
+import { getProfilesPageDataAction } from "@/actions/roles";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ProfileKPIs } from "./components/profile-kpis";
 import { ProfileManagerClient } from "./components/profile-manager-client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +36,7 @@ export default function ProfilesPage() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -47,37 +49,20 @@ export default function ProfilesPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
 
-  const fetchProfiles = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
-    const result = await getRolesAction({ page, pageSize, search });
-    if (result.success) {
-      setProfiles(result.data || []);
-      setCount(result.count || 0);
+    const result = await getProfilesPageDataAction({ page, pageSize, search: debouncedSearch });
+    if (result.success && result.data) {
+      setProfiles(result.data.profiles);
+      setCount(result.data.count);
+      setKpiData(result.data.kpis);
+      setAllPermissions(result.data.permissions);
     }
     setLoading(false);
-  }, [page, search]);
-
-  const fetchKPIs = useCallback(async () => {
-    const result = await getProfileKPIsAction();
-    if (result.success) {
-      setKpiData(result.data || null);
-    }
-  }, []);
-
-  const fetchPermissions = useCallback(async () => {
-    const { data } = await getPermissionsAction();
-    setAllPermissions(data || []);
-  }, []);
-
-  const refresh = useCallback(() => {
-    fetchProfiles();
-    fetchKPIs();
-    fetchPermissions();
-  }, [fetchProfiles, fetchKPIs, fetchPermissions]);
+  }, [debouncedSearch, page]);
 
   useEffect(() => {
-    const timeout = setTimeout(refresh, 100);
-
+    const timeout = setTimeout(refresh, 0);
     return () => clearTimeout(timeout);
   }, [refresh]);
 
@@ -150,10 +135,7 @@ export default function ProfilesPage() {
               <ProfileManagerClient
                 profiles={profiles}
                 loading={loading}
-                onSuccess={() => {
-                  fetchProfiles();
-                  fetchKPIs();
-                }}
+                onSuccess={refresh}
                 page={page}
                 setPage={setPage}
                 count={count}
@@ -169,10 +151,7 @@ export default function ProfilesPage() {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         allPermissions={allPermissions}
-        onSuccess={() => {
-          fetchProfiles();
-          fetchKPIs();
-        }}
+        onSuccess={refresh}
       />
     </div>
   );
