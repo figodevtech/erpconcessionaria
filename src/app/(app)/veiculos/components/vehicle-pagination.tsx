@@ -22,23 +22,27 @@ export function VehiclePagination({ page, totalPages, setPage }: { page: number,
 
 
   return (
-    <Pagination className="justify-end">
-      <PaginationContent>
+    <Pagination className="justify-stretch">
+      <PaginationContent className="w-full justify-between gap-2">
         <PaginationItem>
           <PaginationPrevious
             href="#"
             onClick={handlePrevious}
-            className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+            text="Anterior"
+            aria-disabled={page <= 1}
+            className={`h-8 text-xs ${page <= 1 ? "pointer-events-none opacity-50" : ""}`}
           />
         </PaginationItem>
-        <div className="flex items-center justify-center text-sm font-medium px-4">
-          Página {page} de {totalPages}
-        </div>
+        <li className="flex items-center justify-center rounded-md bg-muted/60 px-3 text-xs font-medium text-muted-foreground">
+          Página <span className="mx-1 text-foreground">{page}</span> de {totalPages}
+        </li>
         <PaginationItem>
           <PaginationNext
             href="#"
             onClick={handleNext}
-            className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+            text="Próxima"
+            aria-disabled={page >= totalPages}
+            className={`h-8 text-xs ${page >= totalPages ? "pointer-events-none opacity-50" : ""}`}
           />
         </PaginationItem>
       </PaginationContent>

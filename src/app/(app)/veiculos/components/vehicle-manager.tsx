@@ -14,7 +14,7 @@ export function VehicleManager({
   const [page, setPage] = useState(1)
 
   return (
-    <>
+    <div className="flex min-w-0 flex-col gap-4">
       <VehicleFilters
         search={search}
         setSearch={setSearch}
@@ -29,6 +29,6 @@ export function VehicleManager({
         setPage={setPage}
         onKpisShouldRefresh={onKpisShouldRefresh}
       />
-    </>
+    </div>
   )
 }

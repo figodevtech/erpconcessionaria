@@ -2,7 +2,6 @@ import { createClient } from "@/utils/supabase/server"
 import { VehicleKpiCards } from "./components/vehicle-kpi-cards"
 import { VehicleStatusChart } from "./components/vehicle-status-chart"
 import { VehicleBrandChart } from "./components/vehicle-brand-chart"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { checkPermission } from "@/utils/permissions"
 import { AccessDenied } from "@/components/access-denied"
 import { isVehicleAvailableStatus } from "@/lib/vehicle-status"
@@ -63,21 +62,23 @@ export default async function Dashboard() {
   })).sort((a, b) => b.count - a.count).slice(0, 10); // Top 10 marcas no estoque
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Visão Geral</CardTitle>
-        <CardDescription>
+    <main className="module-canvas">
+      <header className="px-1 sm:px-2">
+        <p className="module-eyebrow">Dashboard</p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+          Visão Geral
+        </h1>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Visão geral do gerenciamento da sua ERP Concessionária.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <VehicleKpiCards data={kpis} />
-        <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3 mt-4">
-          <VehicleBrandChart data={brandData} />
-          <VehicleStatusChart data={statusData} />
-        </div>
-      </CardContent>
-    </Card>
+        </p>
+      </header>
 
+      <VehicleKpiCards data={kpis} />
+
+      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+        <VehicleBrandChart data={brandData} />
+        <VehicleStatusChart data={statusData} />
+      </div>
+    </main>
   )
 }

@@ -11,6 +11,10 @@ export const VEHICLE_STATUSES = [
 
 export type VehicleStatus = (typeof VEHICLE_STATUSES)[number];
 
+export function isVehicleStatus(value: unknown): value is VehicleStatus {
+  return typeof value === "string" && VEHICLE_STATUSES.includes(value as VehicleStatus);
+}
+
 export function isVehicleAvailableStatus(status?: string | null) {
   return VEHICLE_AVAILABLE_STATUSES.includes(status as (typeof VEHICLE_AVAILABLE_STATUSES)[number]);
 }

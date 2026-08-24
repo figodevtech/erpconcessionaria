@@ -24,6 +24,7 @@ import { VehiclePagination } from "@/app/(app)/veiculos/components/vehicle-pagin
 import { AccessDenied } from "@/components/access-denied";
 import { TransactionDialog } from "@/components/finance/transaction-dialog";
 import { TransactionTable } from "@/components/finance/transaction-table";
+import { ModuleKpi, ModuleKpiSkeleton } from "@/components/module/module-kpi";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -317,18 +318,16 @@ function BankKpis({ data }: { data: BankDashboardKpis }) {
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => (
-        <Card key={item.title}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-            <item.icon className={`h-4 w-4 ${item.className}`} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight">{item.value}</div>
-            <p className="text-xs text-muted-foreground">{item.hint}</p>
-          </CardContent>
-        </Card>
+        <ModuleKpi
+          key={item.title}
+          label={item.title}
+          value={item.value}
+          description={item.hint}
+          icon={item.icon}
+          iconClassName={item.className}
+        />
       ))}
     </div>
   );
@@ -336,9 +335,9 @@ function BankKpis({ data }: { data: BankDashboardKpis }) {
 
 function BankKpisSkeleton() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <Skeleton key={index} className="h-32" />
+        <ModuleKpiSkeleton key={index} />
       ))}
     </div>
   );

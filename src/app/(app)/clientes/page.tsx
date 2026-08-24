@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { AccessDenied } from "@/components/access-denied";
+import { ModuleKpiSkeleton } from "@/components/module/module-kpi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { getCustomerKpisAction, listCustomersAction } from "@/actions/customers";
 import { usePermissions } from "@/hooks/use-permissions";
 import type {
@@ -72,11 +72,11 @@ export default function ClientesPage() {
   return (
     <div className="flex flex-col gap-8">
       {!kpis ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ModuleKpiSkeleton />
+          <ModuleKpiSkeleton />
+          <ModuleKpiSkeleton />
+          <ModuleKpiSkeleton />
         </div>
       ) : (
         <CustomerKpis data={kpis} />

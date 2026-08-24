@@ -1,6 +1,5 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search } from "lucide-react"
@@ -28,25 +27,21 @@ export function VehicleFilters({ search, setSearch, status, setStatus, setPage }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm text-muted-foreground">Filtros</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+    <section className="module-toolbar" aria-label="Filtros de veículos">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Buscar marca, modelo, placa..."
-              className="pl-8"
+              className="h-9 border-border/80 bg-background/80 pl-9 shadow-none sm:max-w-md"
               value={search}
               onChange={handleSearchChange}
             />
           </div>
 
           <Select value={status} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="h-9 w-full border-border/80 bg-background/80 shadow-none sm:w-[190px]">
               <SelectValue placeholder="Filtrar por Status" />
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false} align="end">
@@ -60,7 +55,6 @@ export function VehicleFilters({ search, setSearch, status, setStatus, setPage }
             </SelectContent>
           </Select>
         </div>
-      </CardContent>
-    </Card >
+    </section>
   )
 }

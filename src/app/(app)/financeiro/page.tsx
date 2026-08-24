@@ -6,6 +6,7 @@ import { AccessDenied } from "@/components/access-denied";
 import { TransactionDialog } from "@/components/finance/transaction-dialog";
 import { TransactionKpis } from "@/components/finance/transaction-kpis";
 import { TransactionTable } from "@/components/finance/transaction-table";
+import { ModuleKpiSkeleton } from "@/components/module/module-kpi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { VehiclePagination } from "@/app/(app)/veiculos/components/vehicle-pagination";
@@ -17,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getTransactionKpisAction, listTransactionsAction } from "@/actions/transactions";
 import type { Transaction, TransactionKpis as TransactionKpisType, TransactionType } from "@/lib/transactions";
@@ -72,11 +72,11 @@ export default function CashFlowPage() {
       {kpis ? (
         <TransactionKpis data={kpis} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ModuleKpiSkeleton />
+          <ModuleKpiSkeleton />
+          <ModuleKpiSkeleton />
+          <ModuleKpiSkeleton />
         </div>
       )}
 

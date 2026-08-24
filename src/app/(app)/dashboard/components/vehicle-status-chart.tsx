@@ -1,6 +1,7 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import type { ReactNode } from "react"
+import { ModuleSurface } from "@/components/module/module-surface"
 import { PieChart, Pie, Cell, LabelList } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart"
 
@@ -9,49 +10,53 @@ type StatusData = {
   value: number;
 }
 
-const COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--primary) / 0.8)',
-  'hsl(var(--primary) / 0.6)',
-  'hsl(var(--primary) / 0.4)',
-  'hsl(var(--primary) / 0.2)',
-];
+const chartColors = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
 
 const chartConfig = {
   "Em venda": {
     label: "Em venda",
-    color: "hsl(var(--primary))",
+    color: "var(--chart-1)",
   },
   "Repasse": {
     label: "Repasse",
-    color: "hsl(var(--primary))",
+    color: "var(--chart-2)",
+  },
+  "Em breve": {
+    label: "Em breve",
+    color: "var(--chart-3)",
   },
   "Vendido": {
     label: "Vendido",
-    color: "hsl(var(--primary))",
+    color: "var(--chart-4)",
   },
   "Rascunho": {
     label: "Rascunho",
-    color: "hsl(var(--primary))",
+    color: "var(--chart-5)",
   },
   "Pagamento": {
     label: "Pagamento",
-    color: "hsl(var(--primary))",
+    color: "var(--chart-4)",
+  },
+  "Indefinido": {
+    label: "Indefinido",
+    color: "var(--muted-foreground)",
   },
 
 } satisfies ChartConfig
 
 export function VehicleStatusChart({ data }: { data: StatusData[] }) {
   return (
-    <Card className="col-span-1">
-      <CardHeader>
-        <CardTitle>Status do Estoque</CardTitle>
-        <CardDescription>
-          Distribuição de veículos por status
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="w-full text-primary/30 h-52 sm:h-60 md:h-72">
+    <ModuleSurface
+      title="Status do Estoque"
+      description="Distribuição de veículos por status"
+    >
+        <ChartContainer config={chartConfig} className="h-64 w-full lg:h-72">
           <PieChart>
             <Pie
               data={data}
@@ -64,12 +69,12 @@ export function VehicleStatusChart({ data }: { data: StatusData[] }) {
               isAnimationActive
               animationDuration={600}
             >
-              {data.map((_, index) => (
+              {data.map((item, index) => (
                 <Cell
-                  key={`cell-${index}`}
-                  fill="currentColor"
-                  stroke="oklch(0.623 0.214 259.815)"
-                  className="hover:opacity-80 transition-opacity"
+                  key={`${item.name}-${index}`}
+                  fill={chartColors[index % chartColors.length]}
+                  stroke="var(--card)"
+                  className="transition-opacity hover:opacity-80"
                 />
               ))}
               <LabelList
@@ -77,9 +82,11 @@ export function VehicleStatusChart({ data }: { data: StatusData[] }) {
                 position="outside"
                 fontSize={12}
                 stroke="none"
-                formatter={(value: any) => {
-                  const numValue = Number(value);
-                  return !isNaN(numValue) && numValue > 0 ? numValue : "";
+                formatter={(value: ReactNode) => {
+                  const numValue = typeof value === "number" || typeof value === "string"
+                    ? Number(value)
+                    : Number.NaN
+                  return Number.isFinite(numValue) && numValue > 0 ? numValue : ""
                 }}
                 className="fill-foreground font-medium"
               />
@@ -89,13 +96,12 @@ export function VehicleStatusChart({ data }: { data: StatusData[] }) {
               content={<ChartTooltipContent hideLabel />}
             />
             <ChartLegend
-              className="text-foreground flex-wrap gap-2 text-xs *:basis-1/2 *:justify-center sm:*:basis-1/4 mt-4"
-              content={<ChartLegendContent nameKey="" />}
+              className="mt-3 flex-wrap gap-x-3 gap-y-1 text-xs *:basis-auto *:justify-center"
+              content={<ChartLegendContent nameKey="name" />}
               verticalAlign="bottom"
             />
           </PieChart>
         </ChartContainer>
-      </CardContent>
-    </Card>
+    </ModuleSurface>
   )
 }

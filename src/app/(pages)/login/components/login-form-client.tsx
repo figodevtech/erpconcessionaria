@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ForgotPasswordDialog from "./forgot-password-dialog";
@@ -13,6 +14,7 @@ export function LoginFormClient() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const [forgotOpen, setForgotOpen] = useState(false);
 
@@ -83,15 +85,33 @@ export function LoginFormClient() {
                         <Label htmlFor="password">Senha</Label>
                     </div>
 
-                    <Input
-                        id="password"
-                        type="password"
-                        placeholder="Senha"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete="current-password"
-                    />
+                    <div className="relative">
+                        <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Senha"
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            autoComplete="current-password"
+                            className="pr-9"
+                        />
+
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            aria-label={showPassword ? "Ocultar senha" : "Exibir senha"}
+                            aria-pressed={showPassword}
+                            tabIndex={-1}
+                            className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+                        >
+                            {showPassword ? (
+                                <EyeOff className="size-4" aria-hidden="true" />
+                            ) : (
+                                <Eye className="size-4" aria-hidden="true" />
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>

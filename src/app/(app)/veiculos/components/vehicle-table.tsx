@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Edit, MoreHorizontal, Trash2Icon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { CarFront, Edit, MoreHorizontal, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,42 +33,36 @@ import {
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { usePermissions } from "@/hooks/use-permissions";
 import { type Vehicle } from "./vehicle-list-client";
+import { VehicleStatusBadge } from "./vehicle-status-badge";
 
 export function VehicleTable({
   vehicles,
   loading,
   showImages,
+  bulkMode,
+  selectedVehicleIds,
+  allVisibleSelected,
+  someVisibleSelected,
+  onToggleVehicle,
+  onToggleVisible,
   onEdit,
   onDeleteSuccess,
 }: {
   vehicles: Vehicle[];
   loading: boolean;
   showImages: boolean;
+  bulkMode: boolean;
+  selectedVehicleIds: ReadonlySet<string>;
+  allVisibleSelected: boolean;
+  someVisibleSelected: boolean;
+  onToggleVehicle: (vehicleId: string, checked: boolean) => void;
+  onToggleVisible: (checked: boolean) => void;
   onEdit: (vehicle: Vehicle) => void;
   onDeleteSuccess: () => void;
 }) {
   const { hasPermission } = usePermissions();
   const [isDeleting, setIsDeleting] = useState(false);
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Em venda":
-        return "bg-blue-500/10 text-blue-500";
-      case "Repasse":
-        return "bg-orange-500/10 text-orange-500";
-      case "Em breve":
-        return "bg-purple-500/10 text-purple-500";
-      case "Vendido":
-        return "bg-green-500/10 text-green-500";
-      case "Rascunho":
-        return "bg-gray-500/10 text-gray-500";
-      case "Pagamento":
-        return "bg-yellow-500/10 text-yellow-500";
-      default:
-        return "bg-gray-500/10 text-gray-500";
-    }
-  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -85,7 +79,9 @@ export function VehicleTable({
   };
 
   const profitClassName = (value?: number) =>
-    Number(value ?? 0) >= 0 ? "text-emerald-600" : "text-red-600";
+    Number(value ?? 0) >= 0
+      ? "text-emerald-700 dark:text-emerald-400"
+      : "text-red-700 dark:text-red-400";
 
   const handleDelete = async (id: number) => {
     setIsDeleting(true);
@@ -111,15 +107,27 @@ export function VehicleTable({
   };
 
   return (
-    <div className="relative min-h-[400px] w-full">
+    <div className="relative min-h-[320px] w-full">
       <ScrollArea className="w-full">
-        <div className="min-w-full p-4">
-          <Table className=" text-xs">
-            <TableHeader>
+        <div className={bulkMode ? "min-w-[1368px]" : "min-w-[1320px]"}>
+          <Table className="text-xs">
+            <TableHeader className="bg-muted/55">
               <TableRow>
-                {showImages && <TableHead>Foto</TableHead>}
-                <TableHead>ID</TableHead>
-                <TableHead>Marca / Modelo</TableHead>
+                {bulkMode ? (
+                  <TableHead className="w-12 pl-4">
+                    <Checkbox
+                      className="cursor-pointer"
+                      checked={allVisibleSelected}
+                      indeterminate={someVisibleSelected}
+                      disabled={loading || vehicles.length === 0}
+                      onCheckedChange={(checked) => onToggleVisible(Boolean(checked))}
+                      aria-label="Selecionar todos os veículos desta página"
+                    />
+                  </TableHead>
+                ) : null}
+                {showImages && <TableHead className={bulkMode ? "" : "pl-4"}>Foto</TableHead>}
+                <TableHead className={showImages || bulkMode ? "" : "pl-4"}>ID</TableHead>
+                <TableHead className="min-w-[240px]">Marca / Modelo</TableHead>
                 <TableHead className="text-center">Ano</TableHead>
                 <TableHead className="text-center">Placa</TableHead>
                 <TableHead className="text-right">Valor Compra</TableHead>
@@ -137,33 +145,56 @@ export function VehicleTable({
               {vehicles.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={showImages ? 14 : 13}
-                    className="h-24 text-center text-muted-foreground"
+                    colSpan={13 + (showImages ? 1 : 0) + (bulkMode ? 1 : 0)}
+                    className="h-64 text-center text-muted-foreground"
                   >
-                    {loading ? "Carregando veiculos..." : "Nenhum veiculo encontrado para a busca."}
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      {loading ? (
+                        <span className="size-5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
+                      ) : (
+                        <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <CarFront className="size-5" />
+                        </span>
+                      )}
+                      <span>{loading ? "Carregando veiculos..." : "Nenhum veiculo encontrado para a busca."}</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 vehicles.map((vehicle) => (
                   <TableRow
-                    className="h-14 cursor-pointer"
+                    className={`h-13 transition-colors hover:bg-primary/[0.035] dark:hover:bg-primary/[0.06] ${bulkMode ? "cursor-default" : "cursor-pointer"} ${selectedVehicleIds.has(vehicle.id) ? "bg-primary/[0.055] dark:bg-primary/[0.09]" : ""}`}
                     key={vehicle.id}
-                    onDoubleClick={() => onEdit(vehicle)}
+                    data-state={selectedVehicleIds.has(vehicle.id) ? "selected" : undefined}
+                    onDoubleClick={bulkMode ? undefined : () => onEdit(vehicle)}
                   >
+                    {bulkMode ? (
+                      <TableCell className="pl-4">
+                        <Checkbox
+                          className="cursor-pointer"
+                          checked={selectedVehicleIds.has(vehicle.id)}
+                          onCheckedChange={(checked) => onToggleVehicle(vehicle.id, Boolean(checked))}
+                          aria-label={`Selecionar ${vehicle.brand} ${vehicle.model}`}
+                        />
+                      </TableCell>
+                    ) : null}
                     {showImages && (
-                      <TableCell>
+                      <TableCell className={bulkMode ? "" : "pl-4"}>
                         <Image
                           src={vehicle.image || ""}
                           alt={vehicle.brand}
-                          width={70}
-                          height={70}
-                          className="rounded-md"
+                          width={48}
+                          height={48}
+                          className="size-12 rounded-lg border border-border/70 object-cover"
                         />
                       </TableCell>
                     )}
-                    <TableCell>{vehicle.id}</TableCell>
-                    <TableCell className="min-w-[240px] font-medium">
-                      {vehicle.brand} {vehicle.model} {vehicle.version}
+                    <TableCell className={showImages || bulkMode ? "text-muted-foreground" : "pl-4 text-muted-foreground"}>
+                      {vehicle.id}
+                    </TableCell>
+                    <TableCell className="min-w-[240px]">
+                      <span className="font-semibold text-foreground">{vehicle.brand} {vehicle.model}</span>{" "}
+                      <span className="text-muted-foreground">{vehicle.version}</span>
                     </TableCell>
                     <TableCell className="text-center">{vehicle.year}</TableCell>
                     <TableCell className="text-center uppercase">
@@ -172,10 +203,10 @@ export function VehicleTable({
                     <TableCell className="text-right font-medium">
                       {formatCurrency(Number(vehicle.purchase_price ?? 0))}
                     </TableCell>
-                    <TableCell className="text-right font-medium text-emerald-600">
+                    <TableCell className="text-right font-medium text-emerald-700 dark:text-emerald-400">
                       {formatCurrency(Number(vehicle.total_receitas ?? 0))}
                     </TableCell>
-                    <TableCell className="text-right font-medium text-red-600">
+                    <TableCell className="text-right font-medium text-red-700 dark:text-red-400">
                       {formatCurrency(Number(vehicle.total_despesas ?? 0))}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-primary">
@@ -188,12 +219,7 @@ export function VehicleTable({
                       {formatPercent(vehicle.lucro_percentual)}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge
-                        variant="outline"
-                        className={`border-transparent font-normal ${getStatusColor(vehicle.status || "")}`}
-                      >
-                        {vehicle.status || "Indefinido"}
-                      </Badge>
+                      <VehicleStatusBadge status={vehicle.status} />
                     </TableCell>
                     <TableCell className="text-center">
                       {new Date(vehicle.created_at).toLocaleDateString("pt-BR")}
@@ -203,7 +229,8 @@ export function VehicleTable({
                         <DropdownMenuTrigger
                           render={
                             <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
+                              <MoreHorizontal className="size-4" />
+                              <span className="sr-only">Ações do veículo</span>
                             </Button>
                           }
                         />
