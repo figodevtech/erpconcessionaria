@@ -1,5 +1,6 @@
 "use client";
 
+import { notifySiteMutation, notifyPendingSiteMutation } from "@/lib/site-sync-feedback";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Image as ImageIcon, Instagram, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
@@ -112,6 +113,7 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
       };
 
       if (!response.ok || !data.success) {
+        notifyPendingSiteMutation(data);
         throw new Error(data.message || data.error || "Não foi possível buscar imagens do Instagram.");
       }
 
@@ -201,7 +203,7 @@ export function InstagramImporter({ vehicleId, disabled, startSortOrder, onImpor
         throw new Error(data.message || data.error || "Não foi possível importar as imagens.");
       }
 
-      toast.success("Imagens importadas com sucesso.");
+      notifySiteMutation(data, "Imagens importadas com sucesso.");
       onImported?.(data.imported || []);
       setImages([]);
       setSelectedIds(new Set());

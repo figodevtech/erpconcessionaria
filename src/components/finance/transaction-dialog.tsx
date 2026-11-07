@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { notifySiteMutation, notifyPendingSiteMutation } from "@/lib/site-sync-feedback";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import {
@@ -255,8 +256,9 @@ export function TransactionDialog({
 
     startTransition(async () => {
       const result = await createTransactionAction(formData);
+      notifyPendingSiteMutation(result);
       if (result.success) {
-        toast.success("TransaÃ§Ã£o lanÃ§ada com sucesso");
+        notifySiteMutation(result, "TransaÃ§Ã£o lanÃ§ada com sucesso");
         onSuccess(result.vehicle);
         onOpenChange(false);
       } else {

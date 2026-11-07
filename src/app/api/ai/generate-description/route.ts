@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getVerifiedUser } from "@/utils/permissions";
+import { publishSiteChanges } from "@/lib/site-revalidation";
 
 // OpenAI instance will be created inside the route handler
 
@@ -131,6 +132,8 @@ export async function POST(request: Request) {
       throw updateError;
     }
 
+    const siteSync = await publishSiteChanges({ topics: ["vehicles"], vehicleIds: [vehicleId] });
+
     // 5. Incrementar contador e registrar log
     // Usar update para garantir que o registro seja incrementado
     let settingsUpdateError = null;
@@ -169,6 +172,7 @@ export async function POST(request: Request) {
     // Retornar sucesso com estatísticas atualizadas
     return NextResponse.json({
       success: true,
+      siteSync,
       description: aiGeneratedText,
       stats: {
         used: used + 1,

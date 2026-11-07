@@ -42,6 +42,7 @@ export interface InstagramImportedFile {
 
 export interface InstagramImportResponse {
   success: boolean;
+  siteSync?: import("./site-sync").SiteSyncResult;
   imported: InstagramImportedImage[];
   files?: InstagramImportedFile[];
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { notifySiteMutation, notifyPendingSiteMutation } from "@/lib/site-sync-feedback";
 import { useState } from "react";
 import { Loader2, Tags } from "lucide-react";
 import { toast } from "sonner";
@@ -55,6 +56,7 @@ export function VehicleBulkStatusDialog({
         status: selectedStatus,
       });
 
+      notifyPendingSiteMutation(result);
       if (!result.success || !result.data) {
         toast.error(result.error || "Não foi possível alterar os veículos.");
         return;
@@ -65,7 +67,7 @@ export function VehicleBulkStatusDialog({
           `${result.data.updatedCount} de ${result.data.requestedCount} veículos foram atualizados.`,
         );
       } else {
-        toast.success(
+        notifySiteMutation(result,
           `Status alterado em ${result.data.updatedCount} ${result.data.updatedCount === 1 ? "veículo" : "veículos"}.`,
         );
       }

@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from "@/utils/supabase/server";
 import { findVideoByShortcode, getInstagramAccessTokenForUser, InstagramApiError } from "@/lib/instagram/api";
 import { parseInstagramPostUrl } from "@/lib/instagram/extract-instagram-images";
 import { getVerifiedUser } from "@/utils/permissions";
+import { publishSiteChanges } from "@/lib/site-revalidation";
 import {
   downloadInstagramVideo,
   extensionFromVideoContentType,
@@ -102,6 +103,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Vídeo salvo, mas não foi possível vincular ao veículo." }, { status: 500 });
     }
 
+    const siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: [vehicleId] });
+
     const existingPath = existingVideo?.url ? storagePathFromPublicUrl(existingVideo.url) : null;
     if (existingPath && existingPath !== path) {
       await adminSupabase.storage.from("vehicles").remove([existingPath]);
@@ -109,6 +112,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      siteSync,
       video: {
         ...record,
         path,

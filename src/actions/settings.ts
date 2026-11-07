@@ -2,6 +2,8 @@
 
 import { createClient } from "@/utils/supabase/server"
 import { revalidatePath } from "next/cache"
+import { publishSiteChanges } from "@/lib/site-revalidation"
+import { getVerifiedUser, checkAnyPermission } from "@/utils/permissions"
 
 export type AppSettings = {
   id: string;
@@ -28,6 +30,9 @@ export async function getAppSettingsAction() {
 }
 
 export async function updateAppSettingsAction(settings: Partial<AppSettings>) {
+  if (!await getVerifiedUser() || !await checkAnyPermission(["settings:view", "settings:site:update"])) {
+    return { success: false, error: "Sem permissão para alterar as configurações do site." }
+  }
   const supabase = await createClient()
   
   // Since it's a singleton-ish table, we update the first row (or any row if it's truly singleton)
@@ -50,5 +55,8 @@ export async function updateAppSettingsAction(settings: Partial<AppSettings>) {
   
   revalidatePath("/marketing/banners")
   revalidatePath("/configuracoes/site")
-  return { success: true, data: data as AppSettings }
+  const siteSync = ["primary_color", "secondary_color", "banner_interval", "banner_duration"].some((key) => key in settings)
+    ? await publishSiteChanges({ topics: ["settings"] })
+    : undefined
+  return { success: true, data: data as AppSettings, siteSync }
 }

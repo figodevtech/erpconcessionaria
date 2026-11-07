@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { getVerifiedUser } from "@/utils/permissions";
+import { publishSiteChanges } from "@/lib/site-revalidation";
 
 export async function GET(request: Request) {
   try {
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    const siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: [data.vehicle_id] });
+    return NextResponse.json({ ...data, siteSync });
   } catch (err) {
     console.error("Unexpected error in /api/vehicles/videos POST:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -85,17 +87,21 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Video ID is required" }, { status: 400 });
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("vehicle_videos")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .select("vehicle_id");
 
     if (error) {
       console.error("Error deleting vehicle video:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    const siteSync = data?.length
+      ? await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: data.map((video) => video.vehicle_id) })
+      : undefined;
+    return NextResponse.json({ success: true, siteSync });
   } catch (err) {
     console.error("Unexpected error in /api/vehicles/videos DELETE:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

@@ -1,5 +1,6 @@
 ﻿"use client"
 
+import { notifySiteMutation, notifyPendingSiteMutation } from "@/lib/site-sync-feedback";
 import { useCallback, useState, useEffect, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { Loader2, Percent, BadgeCheck, ArrowRight, ReceiptText, Plus, Search } from "lucide-react"
@@ -259,8 +260,9 @@ async function onSubmit(data: VehicleSaleFormValues) {
 
     startTransition(async () => {
       const result = await registerVehicleSaleAction(formData)
+      notifyPendingSiteMutation(result);
       if (result.success) {
-        toast.success("Venda registrada com sucesso!")
+        notifySiteMutation(result, "Venda registrada com sucesso!")
         onSuccess(result.vehicle)
       } else {
         toast.error("Erro: " + result.error)
@@ -386,8 +388,9 @@ async function onSubmit(data: VehicleSaleFormValues) {
                   <AlertDialogAction onClick={() => {
                     startCancelTransition(async () => {
                       const result = await cancelVehicleSaleAction(saleData.id, Number(vehicle.id), shouldDeleteTransactions)
+      notifyPendingSiteMutation(result);
                       if (result.success) {
-                        toast.success("Venda cancelada com sucesso!")
+                        notifySiteMutation(result, "Venda cancelada com sucesso!")
                         setSaleData(null)
                         onSuccess(result.vehicle)
                       } else {

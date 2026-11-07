@@ -1,5 +1,6 @@
 "use client";
 
+import { notifySiteMutation } from "@/lib/site-sync-feedback";
 import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -95,7 +96,8 @@ export function VehicleTable({
         throw new Error(result.error || "Erro ao excluir veiculo");
       }
 
-      toast.success("Veiculo excluido com sucesso!");
+      const publication = await response.json();
+      notifySiteMutation(publication, "Veiculo excluido com sucesso!");
       onDeleteSuccess();
     } catch (error: unknown) {
       console.error("Error deleting vehicle:", error);

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/utils/supabase/server";
+import { publishSiteChanges } from "@/lib/site-revalidation";
+import type { SiteSyncResult } from "@/types/site-sync";
 import { getVerifiedUser, checkPermission } from "@/utils/permissions";
 import type {
   PaymentMethod,
@@ -21,6 +23,7 @@ type ActionResult<T> = {
   vehicle?: unknown;
   count?: number;
   error?: string;
+  siteSync?: SiteSyncResult;
 };
 
 function parseMoney(value?: string | null) {
@@ -359,6 +362,7 @@ export async function createTransactionAction(
   if (error) return { success: false, error: error.message };
 
   let transaction = mapTransaction(data as unknown as Record<string, unknown>);
+  let siteSync: SiteSyncResult | undefined;
 
   // If this transaction is linked to a sale, check if it's fully paid
   if (payload.venda_id) {
@@ -383,10 +387,13 @@ export async function createTransactionAction(
 
       // 3. Only complete if total paid >= total sale value
       if (totalPaid >= Number(sale.total_value)) {
-        await admin.from("sales").update({ status: 'CONCLUIDA' }).eq("id", payload.venda_id);
+        const { error: saleStatusError } = await admin.from("sales").update({ status: 'CONCLUIDA' }).eq("id", payload.venda_id);
+        if (saleStatusError) return { success: false, error: "Lançamento salvo, mas não foi possível atualizar a venda: " + saleStatusError.message };
         
         if (payload.vehicle_id) {
-          await admin.from("vehicles").update({ status: 'Vendido' }).eq("id", payload.vehicle_id);
+          const { data: changedVehicles, error: vehicleStatusError } = await admin.from("vehicles").update({ status: 'Vendido' }).eq("id", payload.vehicle_id).select("id");
+          if (vehicleStatusError || !changedVehicles?.length) return { success: false, error: "Lançamento salvo, mas não foi possível atualizar o status do veículo." };
+          siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: changedVehicles.map((vehicle) => vehicle.id) });
         }
       }
     }
@@ -402,7 +409,7 @@ export async function createTransactionAction(
   if (attachment) {
     if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(attachment.type)) {
       await admin.from("transactions").delete().eq("id", transaction.id);
-      return { success: false, error: "Anexe apenas PDF ou imagem JPG, PNG ou WebP." };
+      return { success: false, error: "Anexe apenas PDF ou imagem JPG, PNG ou WebP.", siteSync };
     }
 
     const safeName = sanitizeFileName(attachment.name);
@@ -418,7 +425,7 @@ export async function createTransactionAction(
 
     if (uploadError) {
       await admin.from("transactions").delete().eq("id", transaction.id);
-      return { success: false, error: uploadError.message };
+      return { success: false, error: uploadError.message, siteSync };
     }
 
     const { data: signed } = await admin.storage
@@ -443,7 +450,7 @@ export async function createTransactionAction(
     if (attachmentError) {
       await admin.storage.from(ATTACHMENTS_BUCKET).remove([filePath]);
       await admin.from("transactions").delete().eq("id", transaction.id);
-      return { success: false, error: attachmentError.message };
+      return { success: false, error: attachmentError.message, siteSync };
     }
 
     transaction = {
@@ -457,10 +464,11 @@ export async function createTransactionAction(
   revalidatePath("/veiculos");
   revalidatePath("/vendas");
 
-  return { success: true, data: transaction, vehicle: updatedVehicle };
+  return { success: true, data: transaction, vehicle: updatedVehicle, siteSync };
 }
 
 export async function softDeleteTransactionAction(id: number) {
+  let siteSync: SiteSyncResult | undefined;
   const user = await getVerifiedUser();
 
   if (!user) return { success: false, error: "Usuário não autenticado." };
@@ -541,10 +549,13 @@ export async function softDeleteTransactionAction(id: number) {
 
       // 3. If total paid is now less than sale value, revert statuses
       if (totalPaid < Number(sale.total_value)) {
-        await admin.from("sales").update({ status: 'PENDENTE' }).eq("id", tx.venda_id);
+        const { error: saleStatusError } = await admin.from("sales").update({ status: 'PENDENTE' }).eq("id", tx.venda_id);
+        if (saleStatusError) return { success: false, error: "Lançamento excluído, mas não foi possível atualizar a venda: " + saleStatusError.message };
         
         if (tx.vehicle_id) {
-          await admin.from("vehicles").update({ status: 'Pagamento' }).eq("id", tx.vehicle_id);
+          const { data: changedVehicles, error: vehicleStatusError } = await admin.from("vehicles").update({ status: 'Pagamento' }).eq("id", tx.vehicle_id).select("id");
+          if (vehicleStatusError || !changedVehicles?.length) return { success: false, error: "Lançamento excluído, mas não foi possível atualizar o status do veículo." };
+          siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: changedVehicles.map((vehicle) => vehicle.id) });
         }
       }
     }
@@ -561,7 +572,7 @@ export async function softDeleteTransactionAction(id: number) {
   revalidatePath("/bancos");
   revalidatePath("/veiculos");
   revalidatePath("/vendas");
-  return { success: true, vehicle: updatedVehicle };
+  return { success: true, vehicle: updatedVehicle, siteSync };
 }
 
 export async function getTransactionAttachmentUrlAction(id: number): Promise<ActionResult<string>> {

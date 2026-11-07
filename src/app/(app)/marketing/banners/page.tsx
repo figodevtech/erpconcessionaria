@@ -1,5 +1,6 @@
 "use client";
 
+import { notifySiteMutation } from "@/lib/site-sync-feedback";
 import { useEffect, useState, useCallback } from "react";
 import {
   getBannersAction,
@@ -57,10 +58,13 @@ export default function BannersPage() {
 
     const result = await upsertBannerAction(newBanner);
     if (result.success) {
+      notifySiteMutation(result, "Banner salvo.");
       setShowUploader(false);
       fetchBanners();
+      return true;
     } else {
       toast.error("Erro ao salvar banner no banco");
+      return false;
     }
   };
 
@@ -69,7 +73,7 @@ export default function BannersPage() {
 
     const result = await deleteBannerAction(id, imageUrl);
     if (result.success) {
-      toast.success("Banner excluído com sucesso");
+      notifySiteMutation(result, "Banner excluído com sucesso");
       fetchBanners();
     } else {
       toast.error("Erro ao excluir banner");
@@ -79,7 +83,7 @@ export default function BannersPage() {
   const handleUpdate = async (id: string, updates: Partial<Banner>) => {
     const result = await upsertBannerAction({ id, ...updates });
     if (result.success) {
-      toast.success("Banner atualizado");
+      notifySiteMutation(result, "Banner atualizado");
       fetchBanners();
     } else {
       toast.error("Erro ao atualizar banner");

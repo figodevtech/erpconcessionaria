@@ -1,5 +1,6 @@
 "use client"
 
+import { notifySiteMutation } from "@/lib/site-sync-feedback";
 import { useEffect, useMemo, useState } from "react"
 import { AppSettings, getAppSettingsAction, updateAppSettingsAction } from "@/actions/settings"
 import { Button } from "@/components/ui/button"
@@ -113,7 +114,7 @@ export function SiteColorSettings() {
 
       if (result.success && result.data) {
         setSettings(result.data)
-        toast.success("Cores do site atualizadas")
+        notifySiteMutation(result, "Cores do site atualizadas")
       } else {
         toast.error("Erro ao salvar configurações")
       }

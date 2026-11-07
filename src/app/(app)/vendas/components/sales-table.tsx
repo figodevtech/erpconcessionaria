@@ -1,5 +1,6 @@
 "use client"
 
+import { notifySiteMutation, notifyPendingSiteMutation } from "@/lib/site-sync-feedback";
 import { useEffect, useState, useTransition, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { toast } from "sonner"
@@ -134,8 +135,9 @@ export function SalesTable({
 
     startTransition(async () => {
       const result = await cancelVehicleSaleAction(saleToCancel.id, saleToCancel.vehicle.id, true)
+      notifyPendingSiteMutation(result);
       if (result.success) {
-        toast.success("Venda cancelada e veículo retornado ao estoque")
+        notifySiteMutation(result, "Venda cancelada e veículo retornado ao estoque")
         setSaleToCancel(null)
         fetchData()
         if (onKpisShouldRefresh) onKpisShouldRefresh()

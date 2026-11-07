@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createAdminClient, createClient } from "@/utils/supabase/server"
 import { getVerifiedUser } from "@/utils/permissions";
+import { publishSiteChanges } from "@/lib/site-revalidation";
 
 export async function getVehicleSaleAction(vehicleId: number) {
   const supabase = await createClient()
@@ -86,14 +87,17 @@ export async function registerVehicleSaleAction(formData: FormData) {
   }
 
   // 2. Update vehicle status to 'Pagamento'
-  const { error: vehicleError } = await supabase
+  const { data: changedVehicles, error: vehicleError } = await supabase
     .from("vehicles")
     .update({ status: 'Pagamento' })
     .eq("id", parseInt(vehicle_id))
+    .select("id")
 
-  if (vehicleError) {
-    return { success: false, error: "Venda registrada, mas erro ao atualizar status do veículo: " + vehicleError.message }
+  if (vehicleError || !changedVehicles?.length) {
+    return { success: false, error: "Venda registrada, mas erro ao atualizar status do veículo: " + (vehicleError?.message || "Veículo não encontrado ou sem permissão.") }
   }
+
+  const siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: [vehicle_id] });
 
   // 3. Fetch updated vehicle
   const { data: updatedVehicle } = await supabase
@@ -106,7 +110,7 @@ export async function registerVehicleSaleAction(formData: FormData) {
   revalidatePath("/dashboard")
   revalidatePath("/vendas")
 
-  return { success: true, data: sale, vehicle: updatedVehicle || null }
+  return { success: true, data: sale, vehicle: updatedVehicle || null, siteSync }
 }
 
 export async function cancelVehicleSaleAction(saleId: number, vehicleId: number, deleteTransactions: boolean = false) {
@@ -190,14 +194,17 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number,
   }
 
   // 3. Update vehicle back to 'Em venda'
-  const { error: vehicleError } = await admin
+  const { data: changedVehicles, error: vehicleError } = await admin
     .from("vehicles")
     .update({ status: 'Em venda' })
     .eq("id", vehicleId)
+    .select("id")
 
-  if (vehicleError) {
-    return { success: false, error: "Venda cancelada, mas erro ao atualizar status do veículo: " + vehicleError.message }
+  if (vehicleError || !changedVehicles?.length) {
+    return { success: false, error: "Venda cancelada, mas erro ao atualizar status do veículo: " + (vehicleError?.message || "Veículo não encontrado.") }
   }
+
+  const siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: [vehicleId] });
 
   // 4. Fetch updated vehicle
   const { data: updatedVehicle } = await admin
@@ -211,7 +218,7 @@ export async function cancelVehicleSaleAction(saleId: number, vehicleId: number,
   revalidatePath("/financeiro")
   revalidatePath("/vendas")
 
-  return { success: true, vehicle: updatedVehicle || null }
+  return { success: true, vehicle: updatedVehicle || null, siteSync }
 }
 
 export async function listSalesAction({

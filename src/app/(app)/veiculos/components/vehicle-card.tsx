@@ -1,3 +1,4 @@
+import { notifySiteMutation } from "@/lib/site-sync-feedback";
 import Image from "next/image";
 import {
   MapPin,
@@ -64,7 +65,8 @@ export function VehicleCard({
         throw new Error(result.error || "Erro ao excluir veículo");
       }
 
-      toast.success("Veículo excluído com sucesso!");
+      const publication = await response.json();
+      notifySiteMutation(publication, "Veículo excluído com sucesso!");
       onDeleteSuccess?.();
     } catch (error: unknown) {
       console.error("Error deleting vehicle:", error);

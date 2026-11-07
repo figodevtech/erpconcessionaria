@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import Image from "next/image";
 
 interface BannerUploaderProps {
-  onSuccess: (data: { url: string; name: string; link?: string }) => void;
+  onSuccess: (data: { url: string; name: string; link?: string }) => Promise<boolean>;
 }
 
 export function BannerUploader({ onSuccess }: BannerUploaderProps) {
@@ -58,13 +58,13 @@ export function BannerUploader({ onSuccess }: BannerUploaderProps) {
       };
 
       const compressedFile = await imageCompression(selectedFile, options);
-      const fileName = `${Date.now()}-${selectedFile.name.split('.')[0]}.webp`;
+      const fileName = `${Date.now()}-${crypto.randomUUID()}.webp`;
       const filePath = `banners/${fileName}`;
 
       const supabase = createClient();
       const { error: uploadError } = await supabase.storage
         .from("website")
-        .upload(filePath, compressedFile);
+        .upload(filePath, compressedFile, { upsert: false, contentType: "image/webp" });
 
       if (uploadError) throw uploadError;
 
@@ -72,12 +72,12 @@ export function BannerUploader({ onSuccess }: BannerUploaderProps) {
         .from("website")
         .getPublicUrl(filePath);
 
-      onSuccess({
+      const saved = await onSuccess({
         url: publicUrl,
         name: bannerName.trim(),
         link: bannerLink.trim() || undefined
       });
-      reset();
+      if (saved) reset();
     } catch (error: any) {
       toast.error(`Erro no upload: ${error.message}`);
     } finally {

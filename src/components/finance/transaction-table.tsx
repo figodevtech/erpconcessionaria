@@ -1,5 +1,6 @@
 "use client";
 
+import { notifySiteMutation, notifyPendingSiteMutation } from "@/lib/site-sync-feedback";
 import { useState, useTransition } from "react";
 import { ArrowDownCircle, ArrowUpCircle, Download, Eye, MoreHorizontal, Paperclip, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -75,8 +76,9 @@ export function TransactionTable({
     setDeletingId(transactionToDelete.id);
     startTransition(async () => {
       const result = await softDeleteTransactionAction(transactionToDelete.id);
+      notifyPendingSiteMutation(result);
       if (result.success) {
-        toast.success("Transação removida");
+        notifySiteMutation(result, "Transação removida");
         setTransactionToDelete(null);
         onChanged(result.vehicle);
       } else {

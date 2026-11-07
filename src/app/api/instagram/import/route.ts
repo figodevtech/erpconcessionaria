@@ -10,6 +10,7 @@ import {
 } from "@/lib/instagram/extract-instagram-images";
 import type { InstagramImportResponse } from "@/types/instagram";
 import { getVerifiedUser } from "@/utils/permissions";
+import { publishSiteChanges } from "@/lib/site-revalidation";
 
 const MAX_IMPORT_IMAGES = 10;
 
@@ -49,11 +50,18 @@ async function getNextVehicleImageSortOrder(
 }
 
 export async function POST(request: Request) {
+  const changedVehicleIds = new Set<number>();
+  const respond = async (payload: Record<string, unknown>, init?: ResponseInit) => {
+    const siteSync = changedVehicleIds.size
+      ? await publishSiteChanges({ topics: ["vehicles"], vehicleIds: [...changedVehicleIds] })
+      : undefined;
+    return NextResponse.json({ ...payload, siteSync, ...(init?.status && init.status >= 400 && changedVehicleIds.size ? { partial: true } : {}) }, init);
+  };
   try {
     const user = await getVerifiedUser();
 
     if (!user) {
-      return NextResponse.json(
+      return respond(
         { success: false, message: "Faça login para importar imagens." },
         { status: 401 },
       );
@@ -61,7 +69,7 @@ export async function POST(request: Request) {
 
     const parsedBody = importSchema.safeParse(await request.json().catch(() => null));
     if (!parsedBody.success) {
-      return NextResponse.json(
+      return respond(
         { success: false, message: "Dados inválidos para importar imagens." },
         { status: 400 },
       );
@@ -70,7 +78,7 @@ export async function POST(request: Request) {
     const { shortcode } = parseInstagramPostUrl(parsedBody.data.postUrl);
     const vehicleId = normalizeVehicleId(parsedBody.data.vehicleId);
     if (parsedBody.data.vehicleId !== undefined && !vehicleId) {
-      return NextResponse.json(
+      return respond(
         { success: false, message: "Veículo inválido para vincular as imagens." },
         { status: 400 },
       );
@@ -86,7 +94,7 @@ export async function POST(request: Request) {
     );
 
     if (uniqueRequestedImages.length === 0) {
-      return NextResponse.json(
+      return respond(
         { success: false, message: "Selecione pelo menos uma imagem para importar." },
         { status: 400 },
       );
@@ -129,7 +137,7 @@ export async function POST(request: Request) {
     );
     const invalidImage = resolvedImages.some((image) => !image?.url);
     if (invalidImage) {
-      return NextResponse.json(
+      return respond(
         { success: false, message: "Uma ou mais imagens não foram confirmadas no post público informado." },
         { status: 403 },
       );
@@ -137,7 +145,7 @@ export async function POST(request: Request) {
 
     const { supabase: adminSupabase, error: adminError } = await createAdminClient();
     if (adminError || !adminSupabase) {
-      return NextResponse.json(
+      return respond(
         { success: false, message: "Configuração Supabase de backend ausente." },
         { status: 500 },
       );
@@ -155,7 +163,7 @@ export async function POST(request: Request) {
       const { bytes, contentType } = await downloadInstagramImage(requestedImage.url);
       const extension = extensionFromContentType(contentType);
       if (!extension) {
-        return NextResponse.json(
+        return respond(
           { success: false, message: "Formato de imagem não suportado." },
           { status: 422 },
         );
@@ -168,7 +176,7 @@ export async function POST(request: Request) {
       });
 
       if (uploadError) {
-        return NextResponse.json(
+        return respond(
           { success: false, message: "Erro ao salvar imagem no Supabase Storage." },
           { status: 500 },
         );
@@ -194,7 +202,7 @@ export async function POST(request: Request) {
           .single();
 
         if (error) {
-          return NextResponse.json(
+          return respond(
             {
               success: false,
               message: "Imagem salva no Storage, mas não foi possível vinculá-la ao veículo.",
@@ -204,12 +212,13 @@ export async function POST(request: Request) {
         }
 
         vehicleImage = data;
+        changedVehicleIds.add(vehicleId);
       }
 
       files.push({ path, publicUrl, vehicleImage });
     }
 
-    return NextResponse.json({
+    return respond({
       success: true,
       files,
       imported: files.map((file, index) => ({
@@ -221,20 +230,20 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof InstagramPublicExtractionError || error instanceof InstagramImageDownloadError) {
-      return NextResponse.json(
+      return respond(
         { success: false, message: error.message },
         { status: error.status },
       );
     }
 
     if (error instanceof InstagramApiError) {
-      return NextResponse.json(
+      return respond(
         { success: false, message: error.message },
         { status: error.status },
       );
     }
 
-    return NextResponse.json(
+    return respond(
       { success: false, message: "Não foi possível importar as imagens selecionadas." },
       { status: 500 },
     );

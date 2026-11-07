@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { getVerifiedUser, checkPermission } from "@/utils/permissions";
 import { isVehicleAvailableStatus, isVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
+import { publishSiteChanges } from "@/lib/site-revalidation";
+import type { SiteSyncResult } from "@/types/site-sync";
 
 export type VehicleKpisData = {
   totalVehicles: number;
@@ -22,6 +24,7 @@ type ActionResult<T> = {
   success: boolean;
   data?: T;
   error?: string;
+  siteSync?: SiteSyncResult;
 };
 
 export async function getVehicleKpisAction(): Promise<ActionResult<VehicleKpisData>> {
@@ -107,9 +110,11 @@ export async function updateVehicleStatusesAction(input: {
 
   revalidatePath("/veiculos");
   revalidatePath("/dashboard");
+  const siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: data!.map((vehicle) => vehicle.id) });
 
   return {
     success: true,
+    siteSync,
     data: {
       requestedCount: vehicleIds.length,
       updatedCount,

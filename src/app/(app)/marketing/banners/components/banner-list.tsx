@@ -1,5 +1,6 @@
 "use client";
 
+import { notifySiteMutation, notifyPendingSiteMutation } from "@/lib/site-sync-feedback";
 import { useState, useEffect } from "react";
 import {
   DndContext,
@@ -74,8 +75,9 @@ export function BannerList({ initialBanners, onDelete, onUpdate }: BannerListPro
       }));
 
       const result = await updateBannersOrderAction(orderUpdates);
+      notifyPendingSiteMutation(result);
       if (result.success) {
-        toast.success("Ordem dos banners atualizada!");
+        notifySiteMutation(result, "Ordem dos banners atualizada!");
       } else {
         toast.error("Erro ao salvar nova ordem");
         setBanners(initialBanners); // Revert to source of truth

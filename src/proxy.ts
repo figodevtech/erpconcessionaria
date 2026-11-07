@@ -1,7 +1,10 @@
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/proxy'
 
 export async function proxy(request: NextRequest) {
+  // This machine-to-machine endpoint validates its own bearer token. Sending it
+  // through session auth would redirect the scheduler to /login.
+  if (request.nextUrl.pathname === '/api/site-sync/retry') return NextResponse.next()
   return await updateSession(request)
 }
 

@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { getVerifiedUser } from "@/utils/permissions";
+import { publishSiteChanges } from "@/lib/site-revalidation";
 
 export async function GET(request: Request) {
   try {
@@ -153,7 +154,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data?.[0] || null);
+    const vehicle = data?.[0];
+    if (!vehicle) return NextResponse.json({ error: "Vehicle was not created" }, { status: 500 });
+    const siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: [vehicle.id] });
+    return NextResponse.json({ ...vehicle, siteSync });
   } catch (err) {
     console.error("Unexpected error in /api/vehicles POST:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -196,7 +200,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    return NextResponse.json(data[0]);
+    const siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: [data[0].id] });
+    return NextResponse.json({ ...data[0], siteSync });
   } catch (err) {
     console.error("Unexpected error in /api/vehicles PATCH:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -240,7 +245,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, message: "Veículo excluído com sucesso" });
+    const siteSync = await publishSiteChanges({ topics: ["vehicles", "shorts"], vehicleIds: [data[0].id] });
+    return NextResponse.json({ success: true, message: "Veículo excluído com sucesso", siteSync });
   } catch (err) {
     console.error("Unexpected error in /api/vehicles DELETE:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

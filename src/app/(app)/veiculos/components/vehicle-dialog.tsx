@@ -87,6 +87,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getSiteSync, notifySiteMutation, notifyPendingSiteMutation } from "@/lib/site-sync-feedback";
 import { cn } from "@/lib/utils";
 import { Vehicle } from "./vehicle-list-client";
 import imageCompression from "browser-image-compression";
@@ -570,9 +571,12 @@ export function VehicleDialog({
       }
 
       const savedVehicle = await response.json();
+      let publication = savedVehicle;
+      let imageOrderFailed = false;
 
       // Update image sort order if we have images and we are editing
       if (isEditing && vehicleImages.length > 1) {
+        try {
         const sortedImages = vehicleImages.map((img, index) => ({
           id: img.id,
           sort_order: index,
@@ -583,14 +587,24 @@ export function VehicleDialog({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ images: sortedImages }),
         });
+        const imageOrderResult = await imagesResponse.json();
+        if (getSiteSync(imageOrderResult)?.status === "pending") publication = imageOrderResult;
 
         if (!imagesResponse.ok) {
           console.error("Failed to update image order");
-          // Non-critical error, we still successfully saved the vehicle
+          imageOrderFailed = true;
+          notifyPendingSiteMutation(imageOrderResult);
+        }
+        } catch {
+          imageOrderFailed = true;
+          console.error("Vehicle saved, but image order confirmation failed");
         }
       }
 
-      toast.success(
+      if (imageOrderFailed) {
+        notifyPendingSiteMutation(savedVehicle);
+        toast.warning("Veículo salvo, mas a ordem das imagens não foi concluída. Confira a galeria.");
+      } else notifySiteMutation(publication,
         isEditing
           ? "Veículo atualizado com sucesso!"
           : "Veículo criado com sucesso!",
@@ -635,7 +649,7 @@ export function VehicleDialog({
         setAiStats(result.stats);
       }
 
-      toast.success("Descrição gerada com IA com sucesso!", {
+      notifySiteMutation(result, "Descrição gerada com IA com sucesso!", {
         description: `Você ainda tem ${result.stats?.remaining || 0} gerações este mês.`
       });
     } catch (error: any) {
@@ -2451,10 +2465,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
     try {
       setUploading(true);
 
-      // Remove previously existing video to keep max 1 constraint
-      if (videoFile?.path) {
-        await supabase.storage.from("vehicles").remove([videoFile.path]);
-      }
+      const previousPath = videoFile?.path;
 
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -2490,9 +2501,13 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
       }
 
       const record = await apiResponse.json();
+      if (previousPath && previousPath !== filePath) {
+        const { error: cleanupError } = await supabase.storage.from("vehicles").remove([previousPath]);
+        if (cleanupError) console.warn("Previous video cleanup remains pending");
+      }
 
       setVideoFile({ id: record.id, url: publicUrl, path: filePath });
-      toast.success(`Vídeo ${type === 'shorts' ? 'Short' : 'de Apresentação'} enviado com sucesso!`);
+      notifySiteMutation(record, `Vídeo ${type === 'shorts' ? 'Short' : 'de Apresentação'} enviado com sucesso!`);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error("Erro ao subir o vídeo.");
@@ -2507,6 +2522,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
 
     try {
       setDeleting(true);
+      let publication: unknown;
 
       // Delete from DB first
       if (videoFile.id) {
@@ -2514,6 +2530,8 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
           method: 'DELETE',
         });
         if (!response.ok) throw new Error("Erro ao remover registro do banco");
+        publication = await response.json();
+        notifyPendingSiteMutation(publication);
       }
 
       // Delete from Storage
@@ -2521,7 +2539,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
       if (error) throw error;
 
       setVideoFile(null);
-      toast.success("Vídeo removido com sucesso!");
+      notifySiteMutation(publication, "Vídeo removido com sucesso!");
     } catch (error) {
       console.error('Delete error:', error);
       toast.error("Erro ao deletar o vídeo.");
@@ -2571,7 +2589,7 @@ function VideoUploader({ vehicleId, type }: { vehicleId: string; type: "shorts" 
         path: result.video.path,
       });
       setInstagramReelUrl("");
-      toast.success("Short importado com sucesso!", { id: loadingToast });
+      notifySiteMutation(result, "Short importado com sucesso!", { id: loadingToast });
     } catch (error) {
       console.error("Instagram reel import error:", error);
       toast.error(error instanceof Error ? error.message : "Erro ao importar short do Instagram.", {
@@ -3008,6 +3026,8 @@ function MediaTab({
 
     setUploading(true);
     const supabase = createClient();
+    let failedImages = 0;
+    let publication: unknown;
 
     for (const image of pendingImages) {
       try {
@@ -3062,6 +3082,7 @@ function MediaTab({
 
         if (!response.ok) throw new Error('Falha ao salvar no banco');
         const savedImage = await response.json();
+        if (!publication || getSiteSync(savedImage)?.status === "pending") publication = savedImage;
 
         // Update form's main image if empty
         if (!form.getValues('image')) {
@@ -3074,6 +3095,7 @@ function MediaTab({
         ));
 
       } catch (error) {
+        failedImages += 1;
         console.error('Upload error:', error);
         setMixedImages(prev => prev.map(img =>
           img.id === image.id ? { ...img, status: 'error' } : img
@@ -3084,7 +3106,10 @@ function MediaTab({
 
     await refreshImages();
     setUploading(false);
-    toast.success('Upload concluído!');
+    if (failedImages > 0) {
+      notifyPendingSiteMutation(publication);
+      toast.warning(`${pendingImages.length - failedImages} de ${pendingImages.length} imagens foram enviadas. Confira as imagens com erro.`);
+    } else notifySiteMutation(publication, 'Upload concluído!');
   };
 
   const activeImage = activeId ? mixedImages.find((i) => i.id === activeId) : null;
@@ -3106,9 +3131,10 @@ function MediaTab({
       });
 
       if (!response.ok) throw new Error("Falha ao deletar imagem");
+      const publication = await response.json();
 
       onImageDeleted(id);
-      toast.success("Imagem removida com sucesso");
+      notifySiteMutation(publication, "Imagem removida com sucesso");
     } catch (error) {
       console.error("Error deleting image:", error);
       toast.error("Erro ao deletar imagem");
@@ -3257,7 +3283,7 @@ function MediaTab({
                       }}
                       onSetMain={(url) => {
                         form.setValue("image", url);
-                        toast.success("Foto principal atualizada!");
+                        toast.info("Foto principal selecionada. Salve o veículo para publicar a alteração.");
                       }}
                       deletingId={deletingId}
                       selectedImageId={selectedImageId}

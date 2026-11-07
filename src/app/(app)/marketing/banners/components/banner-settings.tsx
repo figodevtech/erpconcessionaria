@@ -1,5 +1,6 @@
 "use client";
 
+import { notifySiteMutation } from "@/lib/site-sync-feedback";
 import { useState, useEffect } from "react";
 import { getAppSettingsAction, updateAppSettingsAction, AppSettings } from "@/actions/settings";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ export function BannerSettings() {
       });
       if (result.success && result.data) {
         setSettings(result.data);
-        toast.success("Configuração atualizada");
+        notifySiteMutation(result, "Configuração atualizada");
       } else {
         toast.error("Erro ao atualizar");
       }
